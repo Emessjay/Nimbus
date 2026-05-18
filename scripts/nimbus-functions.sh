@@ -2,7 +2,7 @@
 #
 # Source this from your ~/.zshrc:
 #
-#     source ~/Programs/Nimbus/scripts/nimbus-functions.sh
+#     source ~/Programs/Nimbus-workspace/Nimbus/scripts/nimbus-functions.sh
 #
 # The existing `nimbus` / `nimbus-continue` / `nimbus-resume`
 # helpers from the old setup are preserved here so you can replace any
@@ -15,14 +15,14 @@
 #   nimbus                    # just the hygiene prompt
 #   nimbus "implement X"      # hygiene + task
 nimbus() {
-    cd ~/Programs/Nimbus || return
+    cd ~/Programs/Nimbus-workspace/Nimbus || return
     claude "**read CLAUDE.md before you code for essential hygiene instructions**
 
 $*"
 }
 
-nimbus-continue() { cd ~/Programs/Nimbus && claude --continue; }
-nimbus-resume()   { cd ~/Programs/Nimbus && claude --resume;   }
+nimbus-continue() { cd ~/Programs/Nimbus-workspace/Nimbus && claude --continue; }
+nimbus-resume()   { cd ~/Programs/Nimbus-workspace/Nimbus && claude --resume;   }
 
 # -- dashboard ----------------------------------------------------------
 
@@ -40,7 +40,7 @@ nimbus-dashboard() {
     if tmux has-session -t "$session" 2>/dev/null; then
         tmux attach -t "$session"
     else
-        local script='cd ~/Programs/Nimbus && while true; do clear; ./scripts/list-workers.sh --all; sleep 2; done'
+        local script='cd ~/Programs/Nimbus-workspace/Nimbus && while true; do clear; ./scripts/list-workers.sh --all; sleep 2; done'
         tmux new-session -s "$session" "bash -c $(printf '%q' "$script")"
     fi
 }
@@ -59,7 +59,7 @@ nimbus-dashboard() {
 # If the tmux session already exists, the initial task argument is
 # ignored — you can pass any task message via the live claude prompt.
 nimbus-audit() {
-    cd ~/Programs/Nimbus || return
+    cd ~/Programs/Nimbus-workspace/Nimbus || return
     if ! command -v tmux >/dev/null 2>&1; then
         echo "error: tmux is not installed. Install with: brew install tmux" >&2
         return 1
@@ -99,7 +99,7 @@ Initial task: $task"
 # you want to continue the prior conversation. /loop state is part of
 # the resumed session.
 nimbus-audit-resume() {
-    cd ~/Programs/Nimbus || return
+    cd ~/Programs/Nimbus-workspace/Nimbus || return
     if ! command -v tmux >/dev/null 2>&1; then
         echo "error: tmux is not installed. Install with: brew install tmux" >&2
         return 1
@@ -124,7 +124,7 @@ nimbus-audit-resume() {
 #   nimbus-audit-stop           soft: orphan active workers, kill tmux
 #   nimbus-audit-stop --hard    hard: cancel everyone, then kill tmux
 nimbus-audit-stop() {
-    cd ~/Programs/Nimbus || return
+    cd ~/Programs/Nimbus-workspace/Nimbus || return
     local hard=0
     [[ "${1:-}" == "--hard" ]] && hard=1
 
@@ -198,7 +198,7 @@ nimbus-worker-resume() {
 
     local main_repo
     main_repo=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / { print $2; exit }')
-    [[ -z "$main_repo" ]] && main_repo="$HOME/Programs/Nimbus"
+    [[ -z "$main_repo" ]] && main_repo="$HOME/Programs/Nimbus-workspace/Nimbus"
 
     local state_file="$main_repo/.auditor-state/$slug.state"
     if [[ ! -f "$state_file" ]]; then
