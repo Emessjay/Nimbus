@@ -12,9 +12,10 @@ will block you from editing source code. If you were booted by
 `nimbus-worker` inside a `nimbus-<slug>/` worktree of the home repo,
 read [WORKER.md](WORKER.md) — you are a worker and report status via
 `./scripts/worker-done.sh` and `./scripts/worker-blocked.sh`. If you
-were spawned as a debugger or lightweight, read [DEBUGGER.md](DEBUGGER.md)
-or [LIGHTWEIGHT.md](LIGHTWEIGHT.md) respectively. Either way, the rest
-of this file still applies.
+were spawned as a debugger, lightweight, or critic, read
+[DEBUGGER.md](DEBUGGER.md), [LIGHTWEIGHT.md](LIGHTWEIGHT.md), or
+[CRITIC.md](CRITIC.md) respectively. Either way, the rest of this
+file still applies.
 
 ## Worktree-per-feature
 

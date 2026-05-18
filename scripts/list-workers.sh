@@ -56,20 +56,29 @@ for state_file in "${state_files[@]}"; do
         continue
     fi
 
-    # Pretty kind: worker | pair | lightweight.
+    # Pretty kind: worker | pair | lightweight | critic.
     kind="${role:-worker}"
     [[ "$pair_mode" == "paired" ]] && kind="pair"
 
-    # Rounds column: "-" for solo workers/lightweights, "N/M" for pairs.
+    # Rounds column: "N/M" for pairs and critics (both have a review
+    # loop with the auditor), "-" otherwise.
     rounds="-"
-    if [[ "$pair_mode" == "paired" ]]; then
+    if [[ "$pair_mode" == "paired" || "$kind" == "critic" ]]; then
         rounds="${review_rounds:-0}/${review_cap:-?}"
     fi
 
-    # Count commits ahead of main.
+    # Count commits ahead of main. Critics have no branch, so they
+    # render as "-".
     ahead="-"
-    if git -C "$repo_root" rev-parse --verify "$branch" >/dev/null 2>&1; then
+    if [[ "$kind" == "critic" ]]; then
+        : # no branch
+    elif git -C "$repo_root" rev-parse --verify "$branch" >/dev/null 2>&1; then
         ahead=$(git -C "$repo_root" rev-list --count "main..$branch" 2>/dev/null || echo "?")
+    fi
+
+    # Critics don't have a branch field; show "-" in the BRANCH column.
+    if [[ "$kind" == "critic" ]]; then
+        branch="-"
     fi
 
     # Compute age from spawned_at. -u is critical: spawned_at is in UTC,

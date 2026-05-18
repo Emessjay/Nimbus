@@ -15,8 +15,9 @@ This file is the operational handbook; treat it as binding.
   `--amend`. A second hook (`auditor-no-mutating-bash.sh`) blocks
   these. The sanctioned mutating commands are the agent-control
   scripts (`spawn-worker.sh`, `spawn-pair.sh`, `spawn-lightweight.sh`,
-  `talk-to-worker.sh`, `talk-to-debugger.sh`, `merge-worker.sh`,
-  `merge-lightweight.sh`, `cancel-worker.sh`); when called via these
+  `spawn-critic.sh`, `talk-to-worker.sh`, `talk-to-debugger.sh`,
+  `talk-to-critic.sh`, `merge-worker.sh`, `merge-lightweight.sh`,
+  `merge-critic.sh`, `cancel-worker.sh`); when called via these
   scripts, the inner git operations are permitted.
 - **Never** spawn a `subagent_type: claude` or `general-purpose` Agent
   — those have edit access and would bypass worker-review.
@@ -77,13 +78,14 @@ itself.
 
 ## Choosing the right tier
 
-You have three spawn options. Pick the cheapest that fits:
+You have four spawn options. Pick the cheapest that fits:
 
-| tier         | when                                                                | spawn script                            |
-| ------------ | ------------------------------------------------------------------- | --------------------------------------- |
-| lightweight  | Quick fix you're confident about — no iteration, no tests needed    | `./scripts/spawn-lightweight.sh`        |
-| worker       | Modest change where one auditor review suffices                     | `./scripts/spawn-worker.sh`             |
-| pair         | Iterative work, UI, refactor with many touchpoints, real test suite | `./scripts/spawn-pair.sh`               |
+| tier         | when                                                                                  | spawn script                            |
+| ------------ | ------------------------------------------------------------------------------------- | --------------------------------------- |
+| lightweight  | Quick fix you're confident about — no iteration, no tests needed                      | `./scripts/spawn-lightweight.sh`        |
+| worker       | Modest change where one auditor review suffices                                       | `./scripts/spawn-worker.sh`             |
+| pair         | Iterative work, UI, refactor with many touchpoints, real test suite                   | `./scripts/spawn-pair.sh`               |
+| critic       | Visual review of a merged feature; the critic uses the app and reports back           | `./scripts/spawn-critic.sh`             |
 
 - **lightweight** runs in the main checkout on `fix/<slug>` (no
   worktree), at Sonnet + medium effort. Use it for *any* quick fix
@@ -104,6 +106,13 @@ You have three spawn options. Pick the cheapest that fits:
   section) and ping-pongs revisions until the spec is satisfied — then
   declares the pair done, at which point you do the merge review.
   Default this for anything you'd expect to bounce feedback to twice.
+- **critic** is *not* a coding tier. It runs after a feature has been
+  merged and only when the change has user-visible UI behavior. The
+  critic uses the product as a user would, takes screenshots, and
+  writes a critique to `.auditor-state/<slug>.critique.md`. Hooks
+  block it from reading source or editing anything outside its own
+  outputs. Cap: 1 concurrent critic. See "Critic review" below for
+  the full loop.
 
 ## Specs: the bar the debugger reviews against
 
@@ -142,6 +151,67 @@ The debugger uses this as its **sole** objective standard. If the
 debugger requests something the spec doesn't require, it will escalate
 to you for a spec amendment rather than silently raising the bar — so
 write enough that the work is unambiguous, but no more.
+
+## Critic review
+
+After merging a feature that has user-visible UI behavior, you may
+spawn a **critic** to evaluate it from the outside. The critic is the
+fourth agent tier; it never reads source code, never edits anything
+outside its own outputs, and never orchestrates other agents. Its
+single deliverable is `.auditor-state/<slug>.critique.md`, optionally
+accompanied by screenshots under `.auditor-state/<slug>.screenshots/`.
+
+**When to use it.** Reach for a critic after merging a worker / pair
+whose change has visible UI consequences (new screens, layout
+changes, copy updates, interaction flows). Skip it for backend-only
+changes, internal refactors, or fixes too small to warrant a
+standalone review. The cap of 1 concurrent critic exists precisely
+because the critic is a focused, optional pass — not a default step.
+
+**Writing the brief.** A critic's task brief is short and
+*code-blind*:
+
+- Include the user's **original instructions verbatim** so the
+  critic knows what was promised, not what was built.
+- Include a list of **UI paths to reach** the new or changed
+  features: "open the app, log in as the test user, click Library →
+  New chapter, type three paragraphs, hit Export."
+- Mention setup constraints (`npm run dev-instance.sh` ports, login
+  creds for a seeded test account, anything fiddly).
+- **Do not** include file paths, function names, implementation
+  details, or anything code-flavored. The critic's hooks will block
+  it from reading the code anyway, but a leaky brief that pre-frames
+  the implementation defeats the point.
+
+**The review loop.** When the critic reports `done`:
+
+1. Read `.auditor-state/<slug>.critique.md`. Sample a screenshot or
+   two from the screenshots directory if a finding is unclear from
+   the critique alone.
+2. Decide: **accept** or **revise**.
+   - Accept: run `./scripts/merge-critic.sh <slug>`. This kills the
+     critic's tmux window and sets `state=merged`. The critique file
+     and screenshots are left in place as an archive (use
+     `cancel-worker.sh` later if you want them deleted).
+   - Revise: run `./scripts/talk-to-critic.sh <slug> "<revisions>"`.
+     The script appends every round to
+     `.auditor-state/<slug>.critique.log` and auto-escalates at 5
+     rounds, mirroring the pair review cap.
+
+**Summarizing for the user.** After accepting, your final step is to
+summarize the critic's findings for the user — typically the highest-
+severity issues plus your recommendation (fix now, file for later,
+disagree). Then end your turn silently. Do NOT call `/exit` or kill
+your own tmux session; just stop the response. The user will reply
+or move on.
+
+When a `critic <slug> done` notification arrives, the workflow shape
+is the same as `worker done`: read the deliverable, decide
+accept-vs-revise, and act with one of the two scripts above. When a
+`critic <slug> blocked` arrives, the critic couldn't reach the
+feature — usually a tooling / build issue. Fix it (spawn a
+lightweight if needed) and unblock with `talk-to-critic.sh`, or
+cancel the critic and respawn after the fix.
 
 ## Bootstrapping a new project
 
