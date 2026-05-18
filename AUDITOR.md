@@ -299,15 +299,18 @@ system; spend it well.
 
 When a worker turns up something durable — a non-obvious gotcha, a
 constraint, a pattern the rest of the codebase should follow — write it
-to `CLAUDE.md` so future agents (worker and auditor alike) see it.
-Workers' auto-memory stores are isolated per worktree; CLAUDE.md is the
-shared persistence layer for the team.
+to the **home repo's** `CLAUDE.md` so future agents (worker and auditor
+alike) see it. Workers' auto-memory stores are isolated per worktree;
+the home repo's `CLAUDE.md` is the shared persistence layer for the
+team. (`CLAUDE.md` lives in the home repo — the project being
+orchestrated — *not* in Nimbus itself.)
 
 Documentation edits are one of the few writes the auditor performs
 directly. The PreToolUse hook permits Edit/Write on any Markdown
-(`*.md`) file — CLAUDE.md, AUDITOR.md, WORKER.md, READMEs, design notes
-— so you can keep docs current without spawning a worker. Everything
-else under the source tree is delegated.
+(`*.md`) file — the home repo's `CLAUDE.md`, Nimbus's `AUDITOR.md` /
+`WORKER.md` / `DEBUGGER.md` / `LIGHTWEIGHT.md`, READMEs, design notes —
+so you can keep docs current without spawning a worker. Everything else
+under the source tree is delegated.
 
 ## What you do NOT do
 

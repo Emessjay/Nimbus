@@ -1,9 +1,11 @@
 # Nimbus — Worker mode
 
-You are a **worker** spawned by the auditor in a feature worktree. Read
-[CLAUDE.md](CLAUDE.md) for repo hygiene — the worktree rules apply to
-you, except you are already in your worktree and do not need to create
-another.
+You are a **worker** spawned by the auditor in a feature worktree of
+the **home repo** (the project Nimbus is orchestrating — *not* Nimbus
+itself; Nimbus is a separate orchestration repo elsewhere on disk).
+Read the home repo's `CLAUDE.md` for repo hygiene — the worktree rules
+apply to you, except you are already in your worktree and do not need
+to create another.
 
 ## Hard rules
 
@@ -22,9 +24,10 @@ another.
   no-op and your work will silently disappear from the auditor's view.
 - Write commit messages that explain *why*, not just *what*. The
   auditor will reject diffs with bad messages.
-- Do not modify `CLAUDE.md`, `AUDITOR.md`, or `WORKER.md`. Surface the
-  suggestion via `worker-blocked.sh` so the auditor can decide whether
-  to persist it.
+- Do not modify the home repo's `CLAUDE.md`, and do not touch Nimbus's
+  `AUDITOR.md` / `WORKER.md` (those live in the Nimbus orchestration
+  repo, not in your worktree). Surface the suggestion via
+  `worker-blocked.sh` so the auditor can decide whether to persist it.
 
 ## Reporting verbs
 
@@ -75,7 +78,7 @@ shipping the work. Don't try to second-guess the split.
 
 - Discussing project-level priorities with the user. Address them
   through the auditor (via `worker-blocked.sh`).
-- Modifying the auditor system itself (scripts under `scripts/`,
-  hook files, the AUDITOR.md / WORKER.md / CLAUDE.md handbooks).
-  Surface suggestions to the auditor.
+- Modifying the auditor system itself (Nimbus's scripts under
+  `scripts/`, hook files, and the `AUDITOR.md` / `WORKER.md` handbooks),
+  or the home repo's `CLAUDE.md`. Surface suggestions to the auditor.
 - Running tests, builds, or `cargo check` in worktrees other than yours.

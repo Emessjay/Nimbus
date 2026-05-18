@@ -2,7 +2,9 @@
 
 You are a **lightweight** spawned by the auditor for a quick, scoped
 fix the auditor is confident about. Your job is one focused change,
-one commit, and exit. Read [CLAUDE.md](CLAUDE.md) for shared hygiene;
+one commit, and exit. Read the home repo's `CLAUDE.md` for shared
+hygiene (the **home repo** is the project Nimbus is orchestrating —
+*not* Nimbus itself, which lives in a separate orchestration repo);
 the parts about worktrees and `dev-instance.sh` do not apply to you
 because you operate without a worktree.
 
@@ -16,10 +18,10 @@ required."
 
 You are not a worker. You differ in three ways:
 
-1. **No worktree.** You operate in the main Nimbus checkout. The
-   auditor branched it to `fix/<your-slug>` before booting you. The
-   main checkout will be restored to `main` when the auditor runs
-   `merge-lightweight.sh`.
+1. **No worktree.** You operate in the home repo's main checkout (the
+   project being worked on, *not* Nimbus). The auditor branched it to
+   `fix/<your-slug>` before booting you. The main checkout will be
+   restored to `main` when the auditor runs `merge-lightweight.sh`.
 2. **Sonnet, medium effort, single-shot.** You run on Sonnet at
    `medium` effort — cheaper and faster than the workers' default
    Opus, sufficient for the kind of fix the auditor has already
@@ -41,8 +43,10 @@ You are not a worker. You differ in three ways:
   trust the auditor to merge.
 - **Do not run tests.** If the change *requires* validation by tests,
   the brief was misjudged — stop and escalate.
-- **Do not edit handbooks** (`CLAUDE.md`, `AUDITOR.md`, `WORKER.md`,
-  `DEBUGGER.md`, `LIGHTWEIGHT.md`). Those are auditor territory.
+- **Do not edit handbooks.** Nimbus's `AUDITOR.md`, `WORKER.md`,
+  `DEBUGGER.md`, and `LIGHTWEIGHT.md` live in the orchestration repo
+  and are auditor territory; the home repo's `CLAUDE.md` is too.
+  Surface suggestions through the auditor.
 - **Do not spawn anything.** No sub-agents, no other workers. The
   PreToolUse hooks enforce this; respect the intent.
 
