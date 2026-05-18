@@ -1,0 +1,83 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx tsc:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/auditor-no-code.sh"
+          },
+          {
+            "type": "command",
+            "command": "./.claude/hooks/debugger-no-code.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/auditor-no-mutating-bash.sh"
+          },
+          {
+            "type": "command",
+            "command": "./.claude/hooks/worker-no-orchestration-bash.sh"
+          },
+          {
+            "type": "command",
+            "command": "./.claude/hooks/lightweight-no-orchestration-bash.sh"
+          },
+          {
+            "type": "command",
+            "command": "./.claude/hooks/debugger-no-orchestration-bash.sh"
+          }
+        ]
+      },
+      {
+        "matcher": "Agent",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/auditor-no-editing-subagents.sh"
+          },
+          {
+            "type": "command",
+            "command": "./.claude/hooks/lightweight-no-editing-subagents.sh"
+          },
+          {
+            "type": "command",
+            "command": "./.claude/hooks/debugger-no-editing-subagents.sh"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/auditor-worker-notify.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "logout|prompt_input_exit|bypass_permissions_disabled|other",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/auditor-shutdown.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
