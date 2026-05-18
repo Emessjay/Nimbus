@@ -150,8 +150,12 @@ write enough that the work is unambiguous, but no more.
 
 If the user is asking you to **create a project from scratch** (no
 existing `CLAUDE.md` in the home repo, empty or near-empty repo, the
-ask is "set up …" / "scaffold …" / "start a new …"), do **this before
-anything else**:
+ask is "set up …" / "scaffold …" / "start a new …"), do **these four
+things in order before any feature work begins**. Steps 1–3 are auditor
+work you perform directly (Markdown, scoping, infra scaffolding for
+parallel runs); only step 4 starts delegating to workers.
+
+### 1. Set up `CLAUDE.md`
 
 1. Read `TEMPLATE.md` in the Nimbus repo
    (`../../Nimbus-workspace/Nimbus/TEMPLATE.md` from the home repo
@@ -164,9 +168,64 @@ anything else**:
 4. Leave the rest of `CLAUDE.md` empty for now — project-specific
    hygiene fills in as conventions emerge.
 
-Only after `CLAUDE.md` exists do you proceed to scoping and spawning.
 The handbook system depends on every home repo having a `CLAUDE.md`;
 skipping this step orphans the agents you spawn next.
+
+### 2. Write the design + scope plan
+
+Before spawning anything, write `DESIGN.md` (or `PLAN.md`) at the home
+repo root capturing the project's shape **as you understand it from
+the user's brief**. Cover at minimum:
+
+- **Goal** — one paragraph: what the product does and for whom.
+- **MVP scope** — the smallest version you would call "done"; bullet
+  the user-visible features.
+- **Out of scope (v1)** — things explicitly deferred, so workers don't
+  drift.
+- **Architecture sketch** — stack, top-level modules, data shape,
+  external dependencies. A bullet list is enough; you are not writing
+  a design doc, you are giving workers a shared mental model.
+- **Open questions** — anything you would need a user decision on
+  before a worker could proceed.
+
+Surface the open questions to the user and resolve them now. Cheap to
+ask before code exists; expensive to unwind once five workers have
+built on a misread.
+
+### 3. Set up parallel-launch infrastructure
+
+Workers run in concurrent worktrees, and if multiple instances of the
+product try to bind the same ports, write the same database file, or
+grab the same OS-level lock, they will collide and you will spend
+review cycles chasing ghosts. Before any feature worker is spawned,
+spawn a worker (or do it inline if it's truly a few lines) to add a
+launch script — typically `scripts/dev-instance.sh` — that:
+
+- accepts an instance index (or auto-picks the lowest free one),
+- derives per-instance values for everything stateful: HTTP/dev-server
+  ports, database paths, cache directories, OS app-bundle identifiers,
+  any single-instance locks,
+- exports those as env vars the app reads at startup,
+- prints what it allocated so the user can connect.
+
+The exact knobs depend on the stack — a web app needs unique ports and
+DB paths; a Tauri/Electron app additionally needs unique bundle
+identifiers and user-data dirs; a CLI may only need a unique
+working-directory. Read the template the framework gives you and
+parameterize every collision point.
+
+Document the script in `CLAUDE.md` under a "Worktree-per-feature"
+section so future workers know to launch via it rather than the
+framework's default (`npm run dev`, `cargo run`, etc.) — the default
+will fight the lock.
+
+### 4. Build it
+
+Now the normal workflow applies. Split the MVP from step 2 into
+worker-sized chunks, write specs for the iterative ones (pairs), spawn,
+review, merge. Project-specific conventions (file layout, naming, test
+patterns) start landing in `CLAUDE.md` as workers turn up things worth
+persisting — see "Finding-persistence" below.
 
 ## Workflow
 
