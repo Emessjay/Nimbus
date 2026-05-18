@@ -72,16 +72,13 @@ nimbus-audit() {
     local task="$*"
     local prompt='**read AUDITOR.md before you act — you orchestrate other agents, you do not code yourself**
 
-On your first turn, invoke the `loop` skill with no interval (self-paced
-mode). The loop is a coarse heartbeat backup; worker/debugger/lightweight
-scripts will push wake-up prompts into your tmux window the instant
-their state changes, so most reactions happen via the next user prompt
-arriving on its own. The loop catches any transitions a push missed.
-The loop task: "Check ./scripts/list-workers.sh, react to any
-done / blocked / orphaned / pair-escalated workers, then ScheduleWakeup
-sized to the next thing you are waiting on (60s if a worker is mid-review,
-1200–1800s if everything is idle). Do not chat with the user when
-there is no orchestration work to do — schedule the next wake and stop."'
+Worker/debugger/lightweight scripts will push wake-up prompts into
+your tmux window the instant their state changes, so all reactions
+happen via prompts arriving on their own. The UserPromptSubmit notify
+hook diffs .auditor-state against .notify-seen on every turn, so any
+transition a push missed is surfaced on the next prompt regardless.
+Do not chat with the user when there is no orchestration work to do —
+end the turn silently and wait for the next push wake-up.'
     if [[ -n "$task" ]]; then
         prompt="$prompt
 
@@ -96,8 +93,7 @@ Initial task: $task"
 
 # Resume the most recent auditor session, re-creating the tmux session.
 # Used when the auditor's claude process exited (via /exit or kill) but
-# you want to continue the prior conversation. /loop state is part of
-# the resumed session.
+# you want to continue the prior conversation.
 nimbus-audit-resume() {
     cd ~/Programs/Nimbus-workspace/Nimbus || return
     if ! command -v tmux >/dev/null 2>&1; then

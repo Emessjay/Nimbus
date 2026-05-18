@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Push a wake-up prompt into the auditor's tmux window so it reacts to
-# a state change without waiting for its /loop heartbeat.
+# a state change. This is the auditor's sole reactivity mechanism;
+# without a push wake-up (or a direct user prompt) the auditor sits idle.
 #
 # Usage:
 #   ./scripts/wake-auditor.sh <slug> <kind>
