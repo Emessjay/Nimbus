@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 # PreToolUse hook: block Edit/Write/NotebookEdit when the running
-# Claude session has NIMBUS_ROLE=auditor set. Configured in
+# Claude session has <PROJECT>_ROLE=auditor set. Configured in
 # .claude/settings.json under hooks.PreToolUse.
+#
+# First arg is the project name (e.g. "nimbus", "aletheia"); the hook
+# reads <PROJECT_UPPER>_ROLE from the environment. Default project is
+# "nimbus" so invocations without an arg keep working.
 #
 # Allowed exception: any Markdown file (`*.md`). The auditor may edit
 # documentation directly (CLAUDE.md, AUDITOR.md, WORKER.md, READMEs,
@@ -10,9 +14,12 @@
 
 set -u
 
-# Workers and ordinary `nimbus` sessions do not set this env var, so
-# the hook is a no-op for them.
-if [[ "${NIMBUS_ROLE:-}" != "auditor" ]]; then
+project="${1:-nimbus}"
+role_var="$(printf '%s' "$project" | tr '[:lower:]' '[:upper:]')_ROLE"
+
+# Workers and ordinary sessions do not set this env var, so the hook
+# is a no-op for them.
+if [[ "${!role_var:-}" != "auditor" ]]; then
     exit 0
 fi
 

@@ -1,12 +1,18 @@
 #!/usr/bin/env bash
-# PreToolUse hook for Agent: when NIMBUS_ROLE=debugger, allow only
+# PreToolUse hook for Agent: when <PROJECT>_ROLE=debugger, allow only
 # read-only / non-editing sub-agent types. Mirrors the auditor's
 # subagent restrictions — a coding sub-agent would let the debugger
 # write code through the back door.
+#
+# First arg is the project name (default "nimbus"); the hook reads
+# <PROJECT_UPPER>_ROLE from the environment.
 
 set -u
 
-if [[ "${NIMBUS_ROLE:-}" != "debugger" ]]; then
+project="${1:-nimbus}"
+role_var="$(printf '%s' "$project" | tr '[:lower:]' '[:upper:]')_ROLE"
+
+if [[ "${!role_var:-}" != "debugger" ]]; then
     exit 0
 fi
 

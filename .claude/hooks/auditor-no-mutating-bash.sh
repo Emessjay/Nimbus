@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 # PreToolUse hook for Bash: block git commands that would mutate the
-# repository directly when NIMBUS_ROLE=auditor. The auditor's only
+# repository directly when <PROJECT>_ROLE=auditor. The auditor's only
 # sanctioned mutating path is through the worker scripts; running
 # `git commit` etc. directly bypasses worker review.
 #
-# Workers (NIMBUS_ROLE=worker) and ordinary sessions (no role set)
-# are unaffected.
+# First arg is the project name (default "nimbus"); the hook reads
+# <PROJECT_UPPER>_ROLE from the environment. Workers and ordinary
+# sessions (no role set) are unaffected.
 
 set -u
 
-if [[ "${NIMBUS_ROLE:-}" != "auditor" ]]; then
+project="${1:-nimbus}"
+role_var="$(printf '%s' "$project" | tr '[:lower:]' '[:upper:]')_ROLE"
+
+if [[ "${!role_var:-}" != "auditor" ]]; then
     exit 0
 fi
 

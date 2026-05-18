@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
-# PreToolUse hook for Bash: when NIMBUS_ROLE=lightweight, block any
+# PreToolUse hook for Bash: when <PROJECT>_ROLE=lightweight, block any
 # command that would orchestrate other agents or mutate git beyond what
 # a lightweight needs (commit on its own fix/<slug>, read-only inspection).
+#
+# First arg is the project name (default "nimbus"); the hook reads
+# <PROJECT_UPPER>_ROLE and <PROJECT_UPPER>_WORKER_SLUG from the
+# environment.
 #
 # Allowed:
 #   git commit / git add / git diff / git log / git status / git show
@@ -19,7 +23,12 @@
 
 set -u
 
-if [[ "${NIMBUS_ROLE:-}" != "lightweight" ]]; then
+project="${1:-nimbus}"
+project_upper="$(printf '%s' "$project" | tr '[:lower:]' '[:upper:]')"
+role_var="${project_upper}_ROLE"
+slug_var="${project_upper}_WORKER_SLUG"
+
+if [[ "${!role_var:-}" != "lightweight" ]]; then
     exit 0
 fi
 
@@ -34,7 +43,7 @@ except Exception:
     pass
 ' 2>/dev/null || true)
 
-my_slug="${NIMBUS_WORKER_SLUG:-}"
+my_slug="${!slug_var:-}"
 
 block_patterns=(
     'scripts/spawn-[a-z]+\.sh'

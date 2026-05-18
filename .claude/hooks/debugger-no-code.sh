@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
-# PreToolUse hook: block Edit/Write/NotebookEdit when NIMBUS_ROLE=debugger.
+# PreToolUse hook: block Edit/Write/NotebookEdit when
+# <PROJECT>_ROLE=debugger.
+#
+# First arg is the project name (default "nimbus"); the hook reads
+# <PROJECT_UPPER>_ROLE from the environment.
 #
 # The debugger is the adversarial reviewer of one paired worker. It
 # reads code, runs tests, and messages — it never edits, not even
@@ -7,7 +11,10 @@
 
 set -u
 
-if [[ "${NIMBUS_ROLE:-}" != "debugger" ]]; then
+project="${1:-nimbus}"
+role_var="$(printf '%s' "$project" | tr '[:lower:]' '[:upper:]')_ROLE"
+
+if [[ "${!role_var:-}" != "debugger" ]]; then
     exit 0
 fi
 

@@ -3,8 +3,12 @@
 # auditor inline, so the auditor learns about done/blocked/cancelled
 # workers without having to poll `list-workers.sh`.
 #
-# Scope: only runs when NIMBUS_ROLE=auditor. Worker sessions exit
-# silently so they don't see their own state changes.
+# First arg is the project name (default "nimbus"); the hook reads
+# <PROJECT_UPPER>_ROLE from the environment.
+#
+# Scope: only runs when the project's role env var equals "auditor".
+# Worker sessions exit silently so they don't see their own state
+# changes.
 #
 # Mechanism: reads every .auditor-state/*.state file (key=value format
 # written by spawn-worker.sh / worker-done.sh / worker-blocked.sh /
@@ -21,7 +25,10 @@
 
 set -u
 
-if [[ "${NIMBUS_ROLE:-}" != "auditor" ]]; then
+project="${1:-nimbus}"
+role_var="$(printf '%s' "$project" | tr '[:lower:]' '[:upper:]')_ROLE"
+
+if [[ "${!role_var:-}" != "auditor" ]]; then
     exit 0
 fi
 

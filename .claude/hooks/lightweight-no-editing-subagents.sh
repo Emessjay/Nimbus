@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
-# PreToolUse hook for Agent: when NIMBUS_ROLE=lightweight, allow only
-# read-only sub-agent types. A lightweight is a single-shot fixer; it
-# has no business spawning editing sub-agents.
+# PreToolUse hook for Agent: when <PROJECT>_ROLE=lightweight, allow
+# only read-only sub-agent types. A lightweight is a single-shot
+# fixer; it has no business spawning editing sub-agents.
+#
+# First arg is the project name (default "nimbus"); the hook reads
+# <PROJECT_UPPER>_ROLE from the environment.
 
 set -u
 
-if [[ "${NIMBUS_ROLE:-}" != "lightweight" ]]; then
+project="${1:-nimbus}"
+role_var="$(printf '%s' "$project" | tr '[:lower:]' '[:upper:]')_ROLE"
+
+if [[ "${!role_var:-}" != "lightweight" ]]; then
     exit 0
 fi
 

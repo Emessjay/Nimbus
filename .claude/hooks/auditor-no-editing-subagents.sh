@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
-# PreToolUse hook for Agent: when NIMBUS_ROLE=auditor, allow only
+# PreToolUse hook for Agent: when <PROJECT>_ROLE=auditor, allow only
 # read-only / non-editing sub-agent types. The auditor must not spawn
 # a coding sub-agent — that path bypasses worker-worktree isolation,
 # auditor-review, and the 5-worker cap.
+#
+# First arg is the project name (default "nimbus"); the hook reads
+# <PROJECT_UPPER>_ROLE from the environment.
 #
 # Read-only sub-agent types allowed:
 #   Explore           code search / file lookup
@@ -15,7 +18,10 @@
 
 set -u
 
-if [[ "${NIMBUS_ROLE:-}" != "auditor" ]]; then
+project="${1:-nimbus}"
+role_var="$(printf '%s' "$project" | tr '[:lower:]' '[:upper:]')_ROLE"
+
+if [[ "${!role_var:-}" != "auditor" ]]; then
     exit 0
 fi
 

@@ -1,16 +1,20 @@
 #!/usr/bin/env bash
-# PreToolUse hook for Bash: when NIMBUS_ROLE=worker, block the
+# PreToolUse hook for Bash: when <PROJECT>_ROLE=worker, block the
 # auditor-side orchestration scripts. Workers must not spawn or merge
 # or cancel workers (including themselves) — that role belongs to the
 # auditor exclusively. Workers communicate state with worker-done.sh
 # and worker-blocked.sh; the auditor decides what happens next.
 #
-# Auditor (NIMBUS_ROLE=auditor) and ordinary sessions are unaffected
-# by this hook.
+# First arg is the project name (default "nimbus"); the hook reads
+# <PROJECT_UPPER>_ROLE from the environment. The auditor role and
+# ordinary sessions are unaffected by this hook.
 
 set -u
 
-if [[ "${NIMBUS_ROLE:-}" != "worker" ]]; then
+project="${1:-nimbus}"
+role_var="$(printf '%s' "$project" | tr '[:lower:]' '[:upper:]')_ROLE"
+
+if [[ "${!role_var:-}" != "worker" ]]; then
     exit 0
 fi
 

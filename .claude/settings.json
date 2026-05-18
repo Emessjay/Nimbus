@@ -11,11 +11,11 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./.claude/hooks/auditor-no-code.sh"
+            "command": "./.claude/hooks/auditor-no-code.sh nimbus"
           },
           {
             "type": "command",
-            "command": "./.claude/hooks/debugger-no-code.sh"
+            "command": "./.claude/hooks/debugger-no-code.sh nimbus"
           }
         ]
       },
@@ -24,19 +24,19 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./.claude/hooks/auditor-no-mutating-bash.sh"
+            "command": "./.claude/hooks/auditor-no-mutating-bash.sh nimbus"
           },
           {
             "type": "command",
-            "command": "./.claude/hooks/worker-no-orchestration-bash.sh"
+            "command": "./.claude/hooks/worker-no-orchestration-bash.sh nimbus"
           },
           {
             "type": "command",
-            "command": "./.claude/hooks/lightweight-no-orchestration-bash.sh"
+            "command": "./.claude/hooks/lightweight-no-orchestration-bash.sh nimbus"
           },
           {
             "type": "command",
-            "command": "./.claude/hooks/debugger-no-orchestration-bash.sh"
+            "command": "./.claude/hooks/debugger-no-orchestration-bash.sh nimbus"
           }
         ]
       },
@@ -45,15 +45,15 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./.claude/hooks/auditor-no-editing-subagents.sh"
+            "command": "./.claude/hooks/auditor-no-editing-subagents.sh nimbus"
           },
           {
             "type": "command",
-            "command": "./.claude/hooks/lightweight-no-editing-subagents.sh"
+            "command": "./.claude/hooks/lightweight-no-editing-subagents.sh nimbus"
           },
           {
             "type": "command",
-            "command": "./.claude/hooks/debugger-no-editing-subagents.sh"
+            "command": "./.claude/hooks/debugger-no-editing-subagents.sh nimbus"
           }
         ]
       }
@@ -63,7 +63,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./.claude/hooks/auditor-worker-notify.sh"
+            "command": "./.claude/hooks/auditor-worker-notify.sh nimbus"
           }
         ]
       }
@@ -74,7 +74,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "./.claude/hooks/auditor-shutdown.sh"
+            "command": "./.claude/hooks/auditor-shutdown.sh nimbus"
           }
         ]
       }

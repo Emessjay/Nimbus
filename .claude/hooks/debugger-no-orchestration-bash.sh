@@ -1,14 +1,18 @@
 #!/usr/bin/env bash
-# PreToolUse hook for Bash: when NIMBUS_ROLE=debugger, block any
+# PreToolUse hook for Bash: when <PROJECT>_ROLE=debugger, block any
 # command that would orchestrate other agents or mutate the repo.
 # Allowed: read-only git, npm test, cargo check/test, the three
 # debugger verbs (debugger-handoff/approve/blocked).
 #
-# Other roles unaffected.
+# First arg is the project name (default "nimbus"); the hook reads
+# <PROJECT_UPPER>_ROLE from the environment. Other roles unaffected.
 
 set -u
 
-if [[ "${NIMBUS_ROLE:-}" != "debugger" ]]; then
+project="${1:-nimbus}"
+role_var="$(printf '%s' "$project" | tr '[:lower:]' '[:upper:]')_ROLE"
+
+if [[ "${!role_var:-}" != "debugger" ]]; then
     exit 0
 fi
 
