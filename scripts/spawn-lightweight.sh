@@ -34,8 +34,8 @@ if [[ ! "$slug" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
     exit 1
 fi
 case "$slug" in
-    *-dbg|*-light)
-        echo "error: slug must not end in -dbg or -light (reserved tmux window suffixes)" >&2
+    *-dbg|*-light|*-crit)
+        echo "error: slug must not end in -dbg, -light, or -crit (reserved tmux window suffixes)" >&2
         exit 1
         ;;
 esac

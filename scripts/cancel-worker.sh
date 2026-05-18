@@ -44,11 +44,14 @@ if [[ "$state" == "merged" ]]; then
 fi
 
 # Kill the agent's tmux window(s) if alive. Workers use the bare slug;
-# lightweights add -light; debuggers in a pair add -dbg.
+# lightweights add -light; critics add -crit; debuggers in a pair add -dbg.
 if command -v tmux >/dev/null 2>&1; then
     case "$role" in
         lightweight)
             tmux kill-window -t "nimbus-workers:${slug}-light" 2>/dev/null || true
+            ;;
+        critic)
+            tmux kill-window -t "nimbus-workers:${slug}-crit" 2>/dev/null || true
             ;;
         *)
             tmux kill-window -t "nimbus-workers:$slug" 2>/dev/null || true
@@ -67,6 +70,12 @@ if [[ "$role" == "lightweight" ]]; then
         git -C "$repo_root" checkout main 2>/dev/null || true
     fi
     git -C "$repo_root" branch -D "$branch" 2>/dev/null || true
+elif [[ "$role" == "critic" ]]; then
+    # Critic has no worktree and no branch — it observes only. Remove
+    # the archived critique and screenshots so the slug is truly clean.
+    rm -f "$state_dir/$slug.critique.md"
+    rm -rf "$state_dir/$slug.screenshots"
+    rm -f "$state_dir/$slug.critique.log"
 else
     # Force-remove the worktree (uncommitted changes are discarded).
     if [[ -d "$worktree_path" ]]; then
@@ -92,18 +101,27 @@ mv "$tmp" "$state_file"
 rm -f "$state_dir/$slug.mailbox"
 
 echo "cancelled $role $slug:"
-if [[ "$role" == "lightweight" ]]; then
-    echo "  - killed tmux window nimbus-workers:${slug}-light"
-    echo "  - restored main checkout to 'main'"
-else
-    echo "  - killed tmux window nimbus-workers:$slug"
-    [[ "$pair_mode" == "paired" ]] && echo "  - killed tmux window nimbus-workers:${slug}-dbg"
-    echo "  - force-removed worktree $worktree_path"
-fi
-echo "  - force-deleted branch $branch"
+case "$role" in
+    lightweight)
+        echo "  - killed tmux window nimbus-workers:${slug}-light"
+        echo "  - restored main checkout to 'main'"
+        echo "  - force-deleted branch $branch"
+        ;;
+    critic)
+        echo "  - killed tmux window nimbus-workers:${slug}-crit"
+        echo "  - removed archived critique and screenshots"
+        ;;
+    *)
+        echo "  - killed tmux window nimbus-workers:$slug"
+        [[ "$pair_mode" == "paired" ]] && echo "  - killed tmux window nimbus-workers:${slug}-dbg"
+        echo "  - force-removed worktree $worktree_path"
+        echo "  - force-deleted branch $branch"
+        ;;
+esac
 echo "  - mailbox cleared, state set to cancelled"
 echo
 case "$role" in
     lightweight) echo "respawn with: ./scripts/spawn-lightweight.sh $slug \"<reformulated task>\"" ;;
-    *) echo "respawn with: ./scripts/spawn-worker.sh $slug \"<reformulated task>\"" ;;
+    critic)      echo "respawn with: ./scripts/spawn-critic.sh $slug \"<reformulated task>\"" ;;
+    *)           echo "respawn with: ./scripts/spawn-worker.sh $slug \"<reformulated task>\"" ;;
 esac

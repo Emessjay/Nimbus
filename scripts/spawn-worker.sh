@@ -65,6 +65,12 @@ if [[ ! "$slug" =~ ^[a-z0-9][a-z0-9-]*$ ]]; then
     echo "error: slug must be lowercase alphanumeric with dashes, got: $slug" >&2
     exit 1
 fi
+case "$slug" in
+    *-dbg|*-light|*-crit)
+        echo "error: slug must not end in -dbg, -light, or -crit (reserved tmux window suffixes)" >&2
+        exit 1
+        ;;
+esac
 
 # Resolve @file briefs into inline text.
 if [[ "$task" == @* ]]; then
