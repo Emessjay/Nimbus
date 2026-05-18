@@ -31,7 +31,7 @@ except Exception:
 # Commands invoked through our sanctioned scripts are always allowed —
 # the scripts internally call git commit / git worktree remove / etc.
 # but they implement the auditor's mandate, not a bypass of it.
-if [[ "$cmd" =~ scripts/(spawn-worker|spawn-pair|spawn-lightweight|merge-worker|merge-lightweight|cancel-worker|talk-to-worker|talk-to-debugger)\.sh ]]; then
+if [[ "$cmd" =~ scripts/(spawn-worker|spawn-pair|spawn-lightweight|spawn-critic|merge-worker|merge-lightweight|merge-critic|cancel-worker|talk-to-worker|talk-to-debugger|talk-to-critic)\.sh ]]; then
     exit 0
 fi
 
@@ -65,10 +65,13 @@ The auditor's sanctioned mutating commands are:
   ./scripts/spawn-worker.sh        start a worker
   ./scripts/spawn-pair.sh          start a worker + debugger pair
   ./scripts/spawn-lightweight.sh   start a lightweight (trivial fix, no worktree)
+  ./scripts/spawn-critic.sh        start a critic (UI review, no code reads)
   ./scripts/talk-to-worker.sh      send revisions to a worker
   ./scripts/talk-to-debugger.sh    send a note to a paired debugger
+  ./scripts/talk-to-critic.sh      send revisions to a critic
   ./scripts/merge-worker.sh        land a worker's commits onto main
   ./scripts/merge-lightweight.sh   fast-forward a lightweight onto main
+  ./scripts/merge-critic.sh        accept a critic's findings (archive critique)
   ./scripts/cancel-worker.sh       abort any kind of agent
 
 If you need to change code, spawn an agent. If you need to land work

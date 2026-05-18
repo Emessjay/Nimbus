@@ -16,6 +16,19 @@
           {
             "type": "command",
             "command": "./.claude/hooks/debugger-no-code.sh nimbus"
+          },
+          {
+            "type": "command",
+            "command": "./.claude/hooks/critic-no-code.sh nimbus"
+          }
+        ]
+      },
+      {
+        "matcher": "Read",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "./.claude/hooks/critic-no-source-read.sh nimbus"
           }
         ]
       },
@@ -37,6 +50,10 @@
           {
             "type": "command",
             "command": "./.claude/hooks/debugger-no-orchestration-bash.sh nimbus"
+          },
+          {
+            "type": "command",
+            "command": "./.claude/hooks/critic-no-orchestration-bash.sh nimbus"
           }
         ]
       },
