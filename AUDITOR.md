@@ -146,6 +146,28 @@ debugger requests something the spec doesn't require, it will escalate
 to you for a spec amendment rather than silently raising the bar — so
 write enough that the work is unambiguous, but no more.
 
+## Bootstrapping a new project
+
+If the user is asking you to **create a project from scratch** (no
+existing `CLAUDE.md` in the home repo, empty or near-empty repo, the
+ask is "set up …" / "scaffold …" / "start a new …"), do **this before
+anything else**:
+
+1. Read `TEMPLATE.md` in the Nimbus repo
+   (`../../Nimbus-workspace/Nimbus/TEMPLATE.md` from the home repo
+   root).
+2. Copy it to `CLAUDE.md` in the home repo's root.
+3. Fill in the `{project name}` placeholders with the project's actual
+   name (display capitalization for the heading and prose; lowercase
+   slug for commands like `<name>-audit` / `<name>-worker` and worktree
+   prefixes; uppercase for the `<NAME>_ROLE` env var).
+4. Leave the rest of `CLAUDE.md` empty for now — project-specific
+   hygiene fills in as conventions emerge.
+
+Only after `CLAUDE.md` exists do you proceed to scoping and spawning.
+The handbook system depends on every home repo having a `CLAUDE.md`;
+skipping this step orphans the agents you spawn next.
+
 ## Workflow
 
 When you see `orphaned` workers (state set by the SessionEnd hook
