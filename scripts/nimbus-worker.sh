@@ -76,19 +76,19 @@ fi
 task=""
 [[ -f "$task_file" ]] && task=$(cat "$task_file")
 
-effort=$(grep '^effort=' "$state_file" | head -1 | cut -d= -f2-)
+effort=$(awk '/^effort=/ { print substr($0, index($0,"=")+1); exit }' "$state_file")
 effort="${effort:-medium}"
 # Optional model override; if unset, claude picks the default (Opus).
 # Lightweights set model=sonnet to run cheaper.
-model=$(grep '^model=' "$state_file" | head -1 | cut -d= -f2-)
+model=$(awk '/^model=/ { print substr($0, index($0,"=")+1); exit }' "$state_file")
 
 # Pick the session id field. Workers and lightweights use the canonical
 # session_id; the debugger half of a pair uses debugger_session_id so the
 # two halves of a paired feature have separate Claude sessions.
 if [[ "$role" == "debugger" ]]; then
-    session_id=$(grep '^debugger_session_id=' "$state_file" | head -1 | cut -d= -f2-)
+    session_id=$(awk '/^debugger_session_id=/ { print substr($0, index($0,"=")+1); exit }' "$state_file")
 else
-    session_id=$(grep '^session_id=' "$state_file" | head -1 | cut -d= -f2-)
+    session_id=$(awk '/^session_id=/ { print substr($0, index($0,"=")+1); exit }' "$state_file")
 fi
 
 # Construct the role-specific prompt.
@@ -139,7 +139,7 @@ session was offline; check it once on startup."
 Your slug: $slug
 Your paired worker is in tmux window: $slug (this window: $slug-dbg)
 Shared worktree:
-    $(grep '^worktree_path=' "$state_file" | head -1 | cut -d= -f2-)
+    $(awk '/^worktree_path=/ { print substr($0, index($0,"=")+1); exit }' "$state_file")
 
 The auditor's spec at
     $spec_file
