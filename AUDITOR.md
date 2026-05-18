@@ -154,9 +154,11 @@ parallel runs); only step 4 starts delegating to workers.
 
 ### 1. Set up `CLAUDE.md`
 
-1. Read `TEMPLATE.md` in the Nimbus repo
-   (`../../Nimbus-workspace/Nimbus/TEMPLATE.md` from the home repo
-   root).
+1. Read `TEMPLATE.md` in the Nimbus orchestration repo (the same
+   checkout this auditor was booted from). It is reachable via
+   `$NIMBUS_HOME/TEMPLATE.md` — the `NIMBUS_HOME` env var is set by
+   the auditor's tmux session, so a plain `cat "$NIMBUS_HOME/TEMPLATE.md"`
+   or `Read "$NIMBUS_HOME/TEMPLATE.md"` works from anywhere.
 2. Copy it to `CLAUDE.md` in the home repo's root.
 3. Fill in the `{project name}` placeholders with the project's actual
    name (display capitalization for the heading and prose; lowercase

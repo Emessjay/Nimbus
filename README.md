@@ -23,15 +23,14 @@ dependencies beyond the prerequisites below.
 
 ## Install
 
-1. Make the workspace directory and clone Nimbus into it:
+1. Clone Nimbus anywhere on disk:
 
-       mkdir -p ~/Programs/Nimbus-workspace
-       cd ~/Programs/Nimbus-workspace
-       git clone <this-repo-url> Nimbus
+       git clone <this-repo-url> /path/to/Nimbus
 
-2. Add the wrapper sourcing line to your shell rc:
+2. Add the wrapper sourcing line to your shell rc with the absolute
+   path you just cloned to:
 
-       echo 'source ~/Programs/Nimbus-workspace/Nimbus/scripts/nimbus-functions.sh' >> ~/.zshrc
+       echo 'source /path/to/Nimbus/scripts/nimbus-functions.sh' >> ~/.zshrc
        source ~/.zshrc
 
 3. Verify the wrappers loaded:
@@ -39,22 +38,30 @@ dependencies beyond the prerequisites below.
        type nimbus-audit
        # nimbus-audit is a shell function
 
-## Workspace layout
+The scripts derive `NIMBUS_HOME` from the location of
+`nimbus-functions.sh` at source time, so Nimbus works no matter where
+you cloned it.
 
-Nimbus expects each project you orchestrate (a "home repo") to live as
-a sibling of `Nimbus/` under a `<project>-workspace/` directory:
+## Workspace layout (suggested convention)
+
+The recommended layout puts each project you orchestrate (a "home
+repo") as a sibling of `Nimbus/` under a `<project>-workspace/`
+directory — it keeps Nimbus, the home repo, and per-feature worktrees
+all in one place:
 
     ~/Programs/
-      Nimbus-workspace/
+      nimbus-clone/
         Nimbus/                  # this repo (orchestration only)
-      Aletheia-workspace/
-        Aletheia/                # a home repo
-        aletheia-<slug>/         # worker worktrees, created on demand
+      my-project-clone/
+        my-project/              # a home repo
+        my-project-<slug>/       # worker worktrees, created on demand
 
-The home repo has its own `CLAUDE.md`; Nimbus has the role handbooks
-(`AUDITOR.md`, `WORKER.md`, `DEBUGGER.md`, `LIGHTWEIGHT.md`) that every
-agent reads. When the auditor bootstraps a fresh home repo it copies
-[TEMPLATE.md](TEMPLATE.md) into the home repo's `CLAUDE.md`.
+Nothing in the scripts enforces this layout — it's a convention, not a
+requirement. The home repo has its own `CLAUDE.md`; Nimbus has the
+role handbooks (`AUDITOR.md`, `WORKER.md`, `DEBUGGER.md`,
+`LIGHTWEIGHT.md`, `CRITIC.md`) that every agent reads. When the
+auditor bootstraps a fresh home repo it copies [TEMPLATE.md](TEMPLATE.md)
+into the home repo's `CLAUDE.md`.
 
 ## Usage
 
@@ -86,6 +93,6 @@ read in this order:
 
 1. [CLAUDE.md](CLAUDE.md) — orientation for anyone (Claude or human) editing Nimbus itself
 2. [AUDITOR.md](AUDITOR.md) — the supervisor handbook; the deepest doc
-3. [WORKER.md](WORKER.md), [DEBUGGER.md](DEBUGGER.md), [LIGHTWEIGHT.md](LIGHTWEIGHT.md) — the three coding-agent roles
+3. [WORKER.md](WORKER.md), [DEBUGGER.md](DEBUGGER.md), [LIGHTWEIGHT.md](LIGHTWEIGHT.md), [CRITIC.md](CRITIC.md) — the four agent roles
 4. [TEMPLATE.md](TEMPLATE.md) — what gets dropped into a fresh home repo
 5. `scripts/` — the bash glue (most files are <100 lines)

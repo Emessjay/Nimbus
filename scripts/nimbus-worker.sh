@@ -1,18 +1,22 @@
 #!/usr/bin/env bash
-# Boot a worker / debugger / lightweight Claude session inside a tmux window.
+# Boot a worker / debugger / lightweight / critic Claude session inside
+# a tmux window.
 #
 # Usage:
-#   nimbus-worker.sh [--role worker|debugger|lightweight] <slug>
+#   nimbus-worker.sh [--role worker|debugger|lightweight|critic] <slug>
 #
-# Called by spawn-worker.sh, spawn-pair.sh, or spawn-lightweight.sh inside
-# the tmux window it creates. Not typically invoked directly. Reads the
-# task and pre-assigned session ID from .auditor-state/<slug>.state in
-# the main repo (resolved via `git worktree list`) and execs claude.
+# Called by spawn-worker.sh, spawn-pair.sh, spawn-lightweight.sh, or
+# spawn-critic.sh inside the tmux window it creates. Not typically
+# invoked directly. Reads the task and pre-assigned session ID from
+# .auditor-state/<slug>.state in the main repo (resolved via
+# `git worktree list`) and execs claude.
 #
 # Role drives:
 #   - which handbook the boot prompt points at (WORKER.md / DEBUGGER.md /
-#     LIGHTWEIGHT.md)
-#   - which verbs the boot prompt advertises (worker-done / debugger-approve / etc.)
+#     LIGHTWEIGHT.md / CRITIC.md, all resolved against $NIMBUS_HOME so
+#     the prompt works no matter which home repo Claude lands in)
+#   - which verbs the boot prompt advertises (worker-done /
+#     debugger-approve / critic-done / etc.)
 #   - the NIMBUS_ROLE env var consumed by the PreToolUse hooks
 #   - whether to use session_id or debugger_session_id from .state
 #
@@ -45,16 +49,16 @@ while [[ $# -gt 0 ]]; do
 done
 
 case "$role" in
-    worker|debugger|lightweight) ;;
+    worker|debugger|lightweight|critic) ;;
     *)
-        echo "error: invalid role '$role' (must be worker|debugger|lightweight)" >&2
+        echo "error: invalid role '$role' (must be worker|debugger|lightweight|critic)" >&2
         exit 1
         ;;
 esac
 
 slug="${1:-}"
 if [[ -z "$slug" ]]; then
-    echo "usage: $0 [--role worker|debugger|lightweight] <slug>" >&2
+    echo "usage: $0 [--role worker|debugger|lightweight|critic] <slug>" >&2
     exit 1
 fi
 
@@ -62,6 +66,16 @@ main_repo=$(git worktree list --porcelain 2>/dev/null | awk '/^worktree / { prin
 if [[ -z "$main_repo" ]]; then
     echo "error: not inside a git repo" >&2
     exit 1
+fi
+
+# NIMBUS_HOME tells us where the handbook files live. spawn-* scripts
+# inherit it from the auditor's tmux session env (set by nimbus-audit),
+# and pass it through their tmux new-window -e flag. If it's missing,
+# fall back to "two directories up from this script" — which is correct
+# when Nimbus is its own home repo (e.g. running the test suite here).
+nimbus_home="${NIMBUS_HOME:-}"
+if [[ -z "$nimbus_home" ]]; then
+    nimbus_home="$(cd "$(dirname "$0")/.." && pwd)"
 fi
 
 state_file="$main_repo/.auditor-state/$slug.state"
@@ -82,16 +96,20 @@ effort="${effort:-medium}"
 # Lightweights set model=sonnet to run cheaper.
 model=$(awk '/^model=/ { print substr($0, index($0,"=")+1); exit }' "$state_file")
 
-# Pick the session id field. Workers and lightweights use the canonical
-# session_id; the debugger half of a pair uses debugger_session_id so the
-# two halves of a paired feature have separate Claude sessions.
+# Pick the session id field. Workers, lightweights, and critics use
+# the canonical session_id; the debugger half of a pair uses
+# debugger_session_id so the two halves of a paired feature have
+# separate Claude sessions.
 if [[ "$role" == "debugger" ]]; then
     session_id=$(awk '/^debugger_session_id=/ { print substr($0, index($0,"=")+1); exit }' "$state_file")
 else
     session_id=$(awk '/^session_id=/ { print substr($0, index($0,"=")+1); exit }' "$state_file")
 fi
 
-# Construct the role-specific prompt.
+# Construct the role-specific prompt. Every reference to a handbook
+# uses the absolute $nimbus_home/<HANDBOOK>.md so the prompt resolves
+# correctly regardless of which home repo the agent lands in.
+claude_md_path="$nimbus_home/CLAUDE.md"
 case "$role" in
     worker)
         spec_note=""
@@ -104,7 +122,7 @@ Read it before you start coding. It defines the acceptance criteria the
 debugger (if any) and the auditor will review against. If the spec and
 the task brief disagree, the spec wins."
         fi
-        prompt="**read CLAUDE.md and WORKER.md before you start**
+        prompt="**read $claude_md_path and $nimbus_home/WORKER.md before you start**
 
 Your slug: $slug
 Your task:
@@ -134,7 +152,7 @@ session was offline; check it once on startup."
             echo "error: debugger requires .auditor-state/$slug.spec.md to exist" >&2
             exit 1
         fi
-        prompt="**read CLAUDE.md and DEBUGGER.md before you act — you are the adversarial reviewer of one worker; you never edit code**
+        prompt="**read $claude_md_path and $nimbus_home/DEBUGGER.md before you act — you are the adversarial reviewer of one worker; you never edit code**
 
 Your slug: $slug
 Your paired worker is in tmux window: $slug (this window: $slug-dbg)
@@ -162,7 +180,7 @@ You run tests, you read commits, you do not edit. A PreToolUse hook
 will block any Edit/Write attempt."
         ;;
     lightweight)
-        prompt="**read CLAUDE.md and LIGHTWEIGHT.md before you act — you are a single-shot fixer for trivial changes**
+        prompt="**read $claude_md_path and $nimbus_home/LIGHTWEIGHT.md before you act — you are a single-shot fixer for trivial changes**
 
 Your slug: $slug
 Your task:
@@ -179,10 +197,45 @@ When done, commit on your fix/$slug branch and run:
 The auditor will fast-forward your branch into main with
 merge-lightweight.sh."
         ;;
+    critic)
+        prompt="**read $claude_md_path and $nimbus_home/CRITIC.md before you act — you review the UI as a user, never reading source code**
+
+Your slug: $slug
+Your task (the user paths to navigate and what to look for):
+
+$task
+
+You operate in the main checkout, not a worktree. You do NOT edit code:
+PreToolUse hooks will block Edit / Write / NotebookEdit for any path
+outside your own outputs. You also do NOT read source files: a hook
+blocks Read on the home repo except for .auditor-state/$slug.task,
+.auditor-state/$slug.state, .auditor-state/$slug.critique.md, anything
+under .auditor-state/$slug.screenshots/, and the handbooks ($nimbus_home/CRITIC.md
+and the home repo's CLAUDE.md).
+
+Your output is a single markdown file at:
+    $main_repo/.auditor-state/$slug.critique.md
+Screenshots go under:
+    $main_repo/.auditor-state/$slug.screenshots/
+
+Use whatever browser-driving tool your home repo provides (e.g. a
+Playwright/Puppeteer MCP, an Explore subagent that drives a headless
+browser, or the system 'screencapture' if testing a desktop app).
+
+When the critique is committed to disk, run:
+    ./scripts/critic-done.sh \"<one-line summary of findings>\"
+If you cannot reach the feature (app won't boot, login broken, etc.),
+run:
+    ./scripts/critic-blocked.sh \"<reason>\"
+
+The auditor will deliver revision feedback via tmux; treat any incoming
+prompt as the next user message."
+        ;;
 esac
 
 export NIMBUS_ROLE="$role"
 export NIMBUS_WORKER_SLUG="$slug"
+export NIMBUS_HOME="$nimbus_home"
 
 name_prefix="$role"
 [[ "$role" == "worker" ]] && name_prefix="worker"

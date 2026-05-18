@@ -175,12 +175,14 @@ for w in "$slug" "${slug}-dbg"; do
     fi
 done
 
+nimbus_home="${NIMBUS_HOME:-$(cd "$repo_root" && pwd)}"
+
 if tmux has-session -t "$tmux_session" 2>/dev/null; then
-    tmux new-window -t "$tmux_session:" -n "$slug" -c "$worktree_path" "$worker_cmd"
+    tmux new-window -t "$tmux_session:" -n "$slug" -c "$worktree_path" -e NIMBUS_HOME="$nimbus_home" "$worker_cmd"
 else
-    tmux new-session -d -s "$tmux_session" -n "$slug" -c "$worktree_path" "$worker_cmd"
+    tmux new-session -d -s "$tmux_session" -n "$slug" -c "$worktree_path" -e NIMBUS_HOME="$nimbus_home" "$worker_cmd"
 fi
-tmux new-window -t "$tmux_session:" -n "${slug}-dbg" -c "$worktree_path" "$debugger_cmd"
+tmux new-window -t "$tmux_session:" -n "${slug}-dbg" -c "$worktree_path" -e NIMBUS_HOME="$nimbus_home" "$debugger_cmd"
 
 echo "spawned pair: $slug"
 echo "  worktree:           $worktree_path"

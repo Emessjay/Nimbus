@@ -3,11 +3,11 @@
 ## Auditor system
 
 The agent role handbooks (`AUDITOR.md`, `WORKER.md`, `DEBUGGER.md`,
-`LIGHTWEIGHT.md`) live in the **Nimbus orchestration repo**, not in
-this repo. Read Nimbus's
-[CLAUDE.md](../../Nimbus-workspace/Nimbus/CLAUDE.md) for the
-auditor-system orientation — it links each role handbook and spells out
-the conventions agents follow.
+`LIGHTWEIGHT.md`, `CRITIC.md`) live in the **Nimbus orchestration
+repo** — the same checkout this agent was booted from. Read Nimbus's
+`CLAUDE.md` (resolvable via `$NIMBUS_HOME/CLAUDE.md`, or by following
+the path that booted you) for the auditor-system orientation — it
+links each role handbook and spells out the conventions agents follow.
 
 If you were booted by `{project name}-audit` (env
 `{project name}_ROLE=auditor`), you are the supervisor and a PreToolUse

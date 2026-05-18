@@ -140,10 +140,12 @@ if tmux list-windows -t "$tmux_session" -F "#{window_name}" 2>/dev/null | grep -
     tmux kill-window -t "$tmux_session:$window_name" 2>/dev/null || true
 fi
 
+nimbus_home="${NIMBUS_HOME:-$(cd "$repo_root" && pwd)}"
+
 if tmux has-session -t "$tmux_session" 2>/dev/null; then
-    tmux new-window -t "$tmux_session:" -n "$window_name" -c "$repo_root" "$worker_cmd"
+    tmux new-window -t "$tmux_session:" -n "$window_name" -c "$repo_root" -e NIMBUS_HOME="$nimbus_home" "$worker_cmd"
 else
-    tmux new-session -d -s "$tmux_session" -n "$window_name" -c "$repo_root" "$worker_cmd"
+    tmux new-session -d -s "$tmux_session" -n "$window_name" -c "$repo_root" -e NIMBUS_HOME="$nimbus_home" "$worker_cmd"
 fi
 
 echo "spawned lightweight: $slug"
