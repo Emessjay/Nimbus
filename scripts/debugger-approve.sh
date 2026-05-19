@@ -21,14 +21,18 @@ fi
 summary="$*"
 
 worktree="$(git rev-parse --show-toplevel)"
-worktree_name="${worktree##*/}"
-if [[ "$worktree_name" != nimbus-* ]]; then
-    echo "error: not in an nimbus-<slug> worktree" >&2
-    exit 1
-fi
-slug="${worktree_name#nimbus-}"
-
 main_repo=$(git worktree list --porcelain | awk '/^worktree / { print $2; exit }')
+
+slug="${NIMBUS_WORKER_SLUG:-}"
+if [[ -z "$slug" ]]; then
+    main_basename="${main_repo##*/}"
+    worktree_name="${worktree##*/}"
+    if [[ "$worktree_name" != "${main_basename}-"* ]]; then
+        echo "error: NIMBUS_WORKER_SLUG unset and cwd is not a '${main_basename}-<slug>' worktree" >&2
+        exit 1
+    fi
+    slug="${worktree_name#${main_basename}-}"
+fi
 state_dir="$main_repo/.auditor-state"
 state_file="$state_dir/$slug.state"
 review_log="$state_dir/$slug.review.log"

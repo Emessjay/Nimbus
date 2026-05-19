@@ -135,14 +135,19 @@ rm -f "$state_dir/$slug.mailbox"
 
 tmux_session="nimbus-workers"
 window_name="${slug}-light"
-worker_cmd="$repo_root/scripts/nimbus-worker.sh --role lightweight $slug"
+
+nimbus_home="${NIMBUS_HOME:-$(cd "$repo_root" && pwd)}"
+if [[ ! -x "$nimbus_home/scripts/nimbus-worker.sh" ]]; then
+    echo "error: nimbus-worker.sh missing or not executable at $nimbus_home/scripts/nimbus-worker.sh" >&2
+    echo "       check that NIMBUS_HOME points at a Nimbus checkout." >&2
+    exit 1
+fi
+worker_cmd="$nimbus_home/scripts/nimbus-worker.sh --role lightweight $slug"
 
 # Kill any stale window with this name.
 if tmux list-windows -t "$tmux_session" -F "#{window_name}" 2>/dev/null | grep -qx "$window_name"; then
     tmux kill-window -t "$tmux_session:$window_name" 2>/dev/null || true
 fi
-
-nimbus_home="${NIMBUS_HOME:-$(cd "$repo_root" && pwd)}"
 
 if tmux has-session -t "$tmux_session" 2>/dev/null; then
     tmux new-window -t "$tmux_session:" -n "$window_name" -c "$repo_root" -e NIMBUS_HOME="$nimbus_home" "$worker_cmd"

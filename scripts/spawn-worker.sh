@@ -14,10 +14,10 @@
 #                   to high for tasks that need deep reasoning.
 #
 # Run by the auditor. Refuses if 5 workers are already active (states
-# `running` or `blocked`). Creates ../nimbus-<slug>/ via
-# scripts/new-worktree.sh if it does not exist, writes state files
-# under .auditor-state/, then boots the worker in a tmux window in the
-# shared `nimbus-workers` session.
+# `running` or `blocked`). Creates a sibling worktree at
+# `<home_repo_path>-<slug>` via scripts/new-worktree.sh if it does not
+# exist, writes state files under .auditor-state/, then boots the
+# worker in a tmux window in the shared `nimbus-workers` session.
 
 set -euo pipefail
 
@@ -96,6 +96,20 @@ repo_root="$(git rev-parse --show-toplevel)"
 state_dir="$repo_root/.auditor-state"
 mkdir -p "$state_dir"
 
+# Resolve Nimbus's own checkout (where new-worktree.sh / nimbus-worker.sh
+# live) early. Defaults to repo_root for the self-orchestration case
+# where Nimbus orchestrates itself. Fail fast if the binaries we depend
+# on aren't there — a missing path used to manifest as a silent
+# tmux-window-died-on-exec, indistinguishable from a claude crash.
+nimbus_home="${NIMBUS_HOME:-$(cd "$repo_root" && pwd)}"
+for required in new-worktree.sh nimbus-worker.sh; do
+    if [[ ! -x "$nimbus_home/scripts/$required" ]]; then
+        echo "error: $required missing or not executable at $nimbus_home/scripts/$required" >&2
+        echo "       check that NIMBUS_HOME points at a Nimbus checkout." >&2
+        exit 1
+    fi
+done
+
 # Preflight: refuse if main has uncommitted changes. Otherwise the
 # eventual merge-worker.sh would have to refuse, leaving the worker
 # stranded. Better to fail fast.
@@ -121,7 +135,7 @@ if [[ "$active" -ge 5 ]]; then
     exit 1
 fi
 
-worktree_path="${repo_root%/*}/nimbus-${slug}"
+worktree_path="${repo_root}-${slug}"
 branch="feature/${slug}"
 
 # Refuse if a worker with this slug is already in flight.
@@ -136,7 +150,7 @@ fi
 
 # Create the worktree if it does not exist.
 if [[ ! -d "$worktree_path" ]]; then
-    "$repo_root/scripts/new-worktree.sh" "$slug"
+    "$nimbus_home/scripts/new-worktree.sh" "$slug"
 fi
 
 session_id=$(uuidgen | tr '[:upper:]' '[:lower:]')
@@ -166,14 +180,12 @@ rm -f "$state_dir/$slug.mailbox"
 # window named after its slug. The session auto-vanishes when the last
 # window closes.
 tmux_session="nimbus-workers"
-worker_cmd="$repo_root/scripts/nimbus-worker.sh $slug"
+worker_cmd="$nimbus_home/scripts/nimbus-worker.sh $slug"
 
 # Kill any stale window from a previous worker with this slug.
 if tmux list-windows -t "$tmux_session" -F "#{window_name}" 2>/dev/null | grep -qx "$slug"; then
     tmux kill-window -t "$tmux_session:$slug" 2>/dev/null || true
 fi
-
-nimbus_home="${NIMBUS_HOME:-$(cd "$repo_root" && pwd)}"
 
 if tmux has-session -t "$tmux_session" 2>/dev/null; then
     tmux new-window -t "$tmux_session:" -n "$slug" -c "$worktree_path" -e NIMBUS_HOME="$nimbus_home" "$worker_cmd"

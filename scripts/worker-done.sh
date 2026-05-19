@@ -4,8 +4,10 @@
 # Usage:
 #   ./scripts/worker-done.sh "<one-line summary>"
 #
-# Must be run from inside the worker's worktree (cwd basename must
-# match nimbus-<slug>). Refuses if no commits ahead of main — this
+# Must be run from inside the worker's worktree. Prefers
+# NIMBUS_WORKER_SLUG (set by nimbus-worker.sh at boot); falls back to
+# parsing cwd against the home repo's basename. Refuses if no commits
+# ahead of main — this
 # catches the common mistake of marking done before committing.
 
 set -euo pipefail
@@ -18,15 +20,22 @@ fi
 summary="$*"
 
 worktree="$(git rev-parse --show-toplevel)"
-worktree_name="${worktree##*/}"
-if [[ "$worktree_name" != nimbus-* ]]; then
-    echo "error: not in an nimbus-<slug> worktree (cwd is $worktree)" >&2
-    exit 1
-fi
-slug="${worktree_name#nimbus-}"
-
 # Resolve the main repo (the first entry from git worktree list).
 main_repo=$(git worktree list --porcelain | awk '/^worktree / { print $2; exit }')
+
+# Prefer the env var set by nimbus-worker.sh at boot. Fall back to
+# parsing cwd against the home repo's basename for manual invocations
+# (e.g. user runs this directly in a worktree shell after env was lost).
+slug="${NIMBUS_WORKER_SLUG:-}"
+if [[ -z "$slug" ]]; then
+    main_basename="${main_repo##*/}"
+    worktree_name="${worktree##*/}"
+    if [[ "$worktree_name" != "${main_basename}-"* ]]; then
+        echo "error: NIMBUS_WORKER_SLUG unset and cwd is not a '${main_basename}-<slug>' worktree (cwd is $worktree)" >&2
+        exit 1
+    fi
+    slug="${worktree_name#${main_basename}-}"
+fi
 state_dir="$main_repo/.auditor-state"
 state_file="$state_dir/$slug.state"
 
