@@ -68,8 +68,21 @@ create a chapter, export to EPUB"). For each path:
    for visual bugs, broken interactions, confusing copy, dead-end
    states, anything a real user would file a complaint about.
 4. **Write the critique** to
-   `.auditor-state/<your-slug>.critique.md`. Organize by user flow,
-   not by implementation. Each issue gets:
+   `.auditor-state/<your-slug>.critique.md`. The very first line is
+   your verdict — the auditor uses it as a gate:
+
+       Verdict: needs-fixes
+
+   or
+
+       Verdict: ship
+
+   Use `ship` only when nothing in your critique would warrant a code
+   change — an empty critique, or one whose remaining items are nits
+   you would not actually push back on as a user. Use `needs-fixes`
+   for anything heavier. There is no third state. Below the verdict
+   line, organize by user flow, not by implementation. Each issue
+   gets:
    - a short label
    - severity (blocker / major / minor / nit)
    - the steps to reproduce
@@ -103,16 +116,36 @@ You have two:
 ## Receiving feedback
 
 You run inside a tmux window named `<your-slug>-crit` in the
-`nimbus-workers` session. The auditor reads your critique and may
-either accept it (calling `merge-critic.sh`, which closes your
-window) or send revisions via `talk-to-critic.sh`. Revisions arrive
-in your tmux terminal as the next user prompt; revise the critique
-on disk and call `critic-done.sh` again with an updated summary.
+`nimbus-workers` session. The auditor reads your critique and either
+accepts a `ship` verdict (calling `merge-critic.sh`, which closes
+your window) or sends a revision prompt via `talk-to-critic.sh`.
+
+A revision prompt is **not** the auditor negotiating the wording of
+your critique. It almost always means the auditor has landed code
+changes addressing some of your findings and wants you to **re-test
+the product against the updated state** and rewrite the critique
+accordingly. Concretely:
+
+- Re-walk the user-flows the brief named, plus any flows touched by
+  the fixes the auditor described.
+- Drop findings whose underlying issue is resolved. Keep ones that
+  still reproduce. Add any new issues the fixes introduced.
+- Re-capture screenshots for issues whose appearance changed.
+- Update the `Verdict:` line. If nothing remains worth a code change,
+  it's now `Verdict: ship`.
+- Call `critic-done.sh` again with an updated one-line summary.
+
+Occasionally a revision prompt will instead push back on a finding
+the auditor isn't going to fix ("we're not going to address X
+because Y — re-evaluate"). Use your judgment: drop or downgrade the
+finding if the counter-argument is convincing, or hold the line and
+re-send the same verdict.
 
 The review loop caps at 5 rounds before auto-escalating to the user,
 mirroring the worker↔debugger loop. If you exceed it, your state
-flips to `blocked` and the auditor decides whether to accept the
-current critique or rephrase the brief.
+flips to `blocked` and the auditor decides whether to ship anyway
+with the unresolved findings, rephrase the brief, or surface to the
+user.
 
 ## What happens on accept
 

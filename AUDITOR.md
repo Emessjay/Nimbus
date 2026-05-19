@@ -218,32 +218,59 @@ because the critic is a focused, optional pass — not a default step.
   it from reading the code anyway, but a leaky brief that pre-frames
   the implementation defeats the point.
 
-**The review loop.** When the critic reports `done`:
+**The loop is fix-until-shippable, not read-and-summarize.** The
+critic is a gate on the merged feature, not a post-mortem report.
+You keep dispatching fixes and re-invoking the critic until it
+declares the work shippable. When the critic reports `done`:
 
-1. Read `.auditor-state/<slug>.critique.md`. Sample a screenshot or
-   two from the screenshots directory if a finding is unclear from
-   the critique alone.
-2. Decide: **accept** or **revise**.
-   - Accept: run `./scripts/merge-critic.sh <slug>`. This kills the
-     critic's tmux window and sets `state=merged`. The critique file
-     and screenshots are left in place as an archive (use
-     `cancel-worker.sh` later if you want them deleted).
-   - Revise: run `./scripts/talk-to-critic.sh <slug> "<revisions>"`.
-     The script appends every round to
-     `.auditor-state/<slug>.critique.log` and auto-escalates at 5
-     rounds, mirroring the pair review cap.
+1. **Read the verdict line.** The first line of
+   `.auditor-state/<slug>.critique.md` is one of:
+   - `Verdict: ship` — the critic has nothing left worth fixing.
+     Accept with `./scripts/merge-critic.sh <slug>` (kills the
+     critic's tmux window, sets `state=merged`, leaves the critique
+     file + screenshots in place as an archive — use
+     `cancel-worker.sh` later if you want them deleted). Then jump
+     to **Summarizing for the user** below.
+   - `Verdict: needs-fixes` — issues remain. Continue with step 2.
+   Sample a screenshot from the screenshots directory if any finding
+   is unclear from the critique text alone.
+2. **Decide which findings warrant a fix.** You can drop or defer
+   any of them, but be honest with yourself — the critic is playing
+   the user's role. Sort by severity; blockers and majors are
+   defaults-yes, nits are defaults-no.
+3. **Dispatch fixers.** Lightweight for one-file copy / CSS /
+   constant changes, worker for anything bigger, pair if you expect
+   iteration — same tier rules as any other delegation. Spawn
+   independent fixers in parallel where they touch disjoint files
+   (see *Default: parallelize* above). Review and merge them as they
+   come back `done`, exactly like normal worker review.
+4. **Re-invoke the critic.** Once every dispatched fix has landed on
+   `main`, run
+   `./scripts/talk-to-critic.sh <slug> "<one-line summary of what
+   you fixed, what you intentionally skipped, and why>"`. The
+   critic's tmux window is still alive; it picks up the revision
+   prompt, re-tests the product against the new `main`, and writes
+   an updated critique with a fresh verdict. Each round bumps
+   `review_rounds` and appends to
+   `.auditor-state/<slug>.critique.log`.
+5. **Loop back to step 1** when the critic next reports `done`.
 
-**Summarizing for the user.** After accepting, your final step is to
-summarize the critic's findings for the user — typically the highest-
-severity issues plus your recommendation (fix now, file for later,
-disagree). Then end your turn silently. Do NOT call `/exit` or kill
-your own tmux session; just stop the response. The user will reply
-or move on.
+The loop only exits via `Verdict: ship` (your merge) or the review
+cap (auto-escalation to you at round 5; from there, surface to the
+user with the unresolved findings and ask whether to ship anyway,
+keep iterating, or shelve). Do not preemptively `merge-critic` a
+`needs-fixes` verdict just because you disagree with the critic —
+the right move is a revision that explains your disagreement and
+lets the critic update its verdict in response.
 
-When a `critic <slug> done` notification arrives, the workflow shape
-is the same as `worker done`: read the deliverable, decide
-accept-vs-revise, and act with one of the two scripts above. When a
-`critic <slug> blocked` arrives, the critic couldn't reach the
+**Summarizing for the user.** After accepting a `ship` verdict, give
+the user a short summary: how many iterations the loop took, the
+highest-severity findings that *were* fixed, and any findings you
+intentionally skipped or that the critic deferred to a nit. Then
+end your turn silently. Do NOT call `/exit` or kill your own tmux
+session; just stop the response. The user will reply or move on.
+
+When a `critic <slug> blocked` arrives, the critic couldn't reach the
 feature — usually a tooling / build issue. Fix it (spawn a
 lightweight if needed) and unblock with `talk-to-critic.sh`, or
 cancel the critic and respawn after the fix.
