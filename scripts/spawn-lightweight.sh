@@ -4,12 +4,13 @@
 # Usage:
 #   ./scripts/spawn-lightweight.sh <slug> <task | @path/to/file>
 #
-# Unlike spawn-worker.sh, a lightweight does NOT get its own worktree.
-# It branches the main checkout to fix/<slug>, makes its tiny edit,
-# commits there, and reports done. The auditor then fast-forwards
-# fix/<slug> into main with merge-lightweight.sh. While the lightweight
-# is alive, the main checkout is on fix/<slug> — the auditor sees
-# whatever the lightweight is working on.
+# Unlike spawn-worker.sh, a lightweight does NOT get its own worktree
+# and does NOT create a branch. It runs in the main checkout, on `main`,
+# and commits directly to `main`. Spawn records the current HEAD into
+# the state file as `start_sha=<sha>` so the auditor can diff the
+# lightweight's contribution with `git diff $start_sha..HEAD`, and so
+# `cancel-worker.sh` can `git revert $start_sha..HEAD` cleanly if
+# things go wrong.
 #
 # Cap: 1 lightweight concurrent. Reserved for quick, single-shot fixes
 # the auditor is confident about — anything from a typo to a small
@@ -99,16 +100,9 @@ if [[ -f "$state_dir/$slug.state" ]]; then
     fi
 fi
 
-branch="fix/$slug"
-
-# Create the branch from main and check it out in the main checkout.
-# This DOES switch the main checkout's HEAD — that's the price of
-# operating without a worktree. merge-lightweight.sh restores main.
-if git -C "$repo_root" rev-parse --verify "$branch" >/dev/null 2>&1; then
-    echo "error: branch $branch already exists; cancel or merge the prior lightweight first" >&2
-    exit 1
-fi
-git -C "$repo_root" checkout -b "$branch"
+# Capture the current HEAD so the auditor (and cancel) can scope diffs /
+# reverts to just the commits this lightweight authored.
+start_sha=$(git -C "$repo_root" rev-parse HEAD)
 
 session_id=$(uuidgen | tr '[:upper:]' '[:lower:]')
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
@@ -121,7 +115,8 @@ state=running
 spawned_at=$now
 updated_at=$now
 worktree_path=$repo_root
-branch=$branch
+branch=main
+start_sha=$start_sha
 session_id=$session_id
 effort=medium
 model=sonnet
@@ -149,12 +144,10 @@ else
 fi
 
 echo "spawned lightweight: $slug"
-echo "  branch:     $branch  (main checkout is now on this branch)"
+echo "  branch:     main  (commits go directly to main)"
+echo "  start_sha:  $start_sha"
 echo "  session_id: $session_id"
 echo "  effort:     medium  (sonnet)"
 echo "  task:       $(echo "$task" | head -1 | cut -c1-80)$([[ $(echo "$task" | wc -l) -gt 1 ]] && echo ' ...')"
 echo
 echo "attach with: tmux attach -t $tmux_session"
-echo
-echo "NOTE: the main checkout will return to 'main' when you run:"
-echo "      ./scripts/merge-lightweight.sh $slug"
