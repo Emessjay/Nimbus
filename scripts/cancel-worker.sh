@@ -1,18 +1,25 @@
 #!/usr/bin/env bash
-# Cancel a worker: kill its tmux window, force-remove its worktree,
-# delete its branch, and mark state=cancelled.
+# Cancel an agent: kill its tmux window(s) and tear down its working
+# state. Per-role details:
+#
+#   worker / pair  — force-remove the worktree, force-delete the branch.
+#                    Uncommitted and committed work on the feature branch
+#                    is lost.
+#   critic         — no worktree, no branch; clean up archived critique
+#                    and screenshots.
+#   lightweight    — no branch to delete (lightweights commit directly
+#                    to `main`). Revert the lightweight's commits with
+#                    `git revert $start_sha..HEAD` so history records
+#                    the undo without rewriting; surfaces any conflict
+#                    rather than silently discarding work.
+#
+# In every case, before tearing anything down: if the main checkout has
+# uncommitted edits, stash them under `cancelled-<slug>-WIP` so they
+# remain recoverable. The state file is preserved as a record
+# (state=cancelled).
 #
 # Usage:
 #   ./scripts/cancel-worker.sh <slug>
-#
-# Use when a worker has gone off the rails and you want a clean slate.
-# Any uncommitted changes in the worker's worktree are LOST. Committed
-# work on the feature branch is also lost (branch is force-deleted).
-# The state file is preserved as a record (state=cancelled).
-#
-# After cancelling, spawn a fresh worker with the same or a different
-# slug:
-#   ./scripts/spawn-worker.sh <slug> "<reformulated task>"
 
 set -euo pipefail
 
@@ -38,10 +45,26 @@ state=$(grep '^state=' "$state_file" | head -1 | cut -d= -f2-)
 role=$(grep '^role=' "$state_file" | head -1 | cut -d= -f2-)
 role="${role:-worker}"
 pair_mode=$(grep '^pair_mode=' "$state_file" | head -1 | cut -d= -f2- || true)
+start_sha=$(grep '^start_sha=' "$state_file" | head -1 | cut -d= -f2- || true)
 
 if [[ "$state" == "merged" ]]; then
     echo "error: $role $slug was already merged; nothing to cancel" >&2
     exit 1
+fi
+
+# Stash any uncommitted edits in the main checkout. A dying agent
+# (especially a lightweight, which operates in the main checkout) can
+# leave WIP that would otherwise be silently lost — branch teardown
+# below doesn't see uncommitted state. The stash is recoverable via
+# `git stash list` / `git stash apply`.
+wip_stash_msg="cancelled-$slug-WIP"
+wip_stashed=0
+if ! git -C "$repo_root" diff --quiet \
+   || ! git -C "$repo_root" diff --cached --quiet \
+   || [[ -n "$(git -C "$repo_root" ls-files --others --exclude-standard)" ]]; then
+    if git -C "$repo_root" stash push --include-untracked -m "$wip_stash_msg" >/dev/null 2>&1; then
+        wip_stashed=1
+    fi
 fi
 
 # Kill the agent's tmux window(s) if alive. Workers use the bare slug;
@@ -63,14 +86,31 @@ if command -v tmux >/dev/null 2>&1; then
     esac
 fi
 
+revert_status="skipped"
 if [[ "$role" == "lightweight" ]]; then
-    # Lightweight has no worktree — its "worktree_path" is the main
-    # checkout. Switch back to main and delete the branch.
-    current=$(git -C "$repo_root" branch --show-current)
-    if [[ "$current" == "$branch" ]]; then
-        git -C "$repo_root" checkout main 2>/dev/null || true
+    # Lightweight commits directly to main — no branch to delete, no
+    # worktree to remove. Undo any commits the lightweight authored
+    # with `git revert` so the history is preserved and the undo is
+    # itself a real commit.
+    if [[ -z "$start_sha" ]]; then
+        echo "warning: no start_sha recorded for lightweight $slug; cannot auto-revert." >&2
+        echo "         (state file pre-dates lightweight-no-branch refactor.)" >&2
+        revert_status="no-start-sha"
+    else
+        head_sha=$(git -C "$repo_root" rev-parse HEAD)
+        if [[ "$head_sha" == "$start_sha" ]]; then
+            revert_status="no-commits"
+        else
+            if git -C "$repo_root" revert --no-edit "$start_sha..HEAD" >/dev/null 2>&1; then
+                revert_status="reverted"
+            else
+                git -C "$repo_root" revert --abort >/dev/null 2>&1 || true
+                echo "error: cancel could not auto-revert lightweight $slug; resolve manually." >&2
+                echo "       range: $start_sha..HEAD" >&2
+                revert_status="conflict"
+            fi
+        fi
     fi
-    git -C "$repo_root" branch -D "$branch" 2>/dev/null || true
 elif [[ "$role" == "critic" ]]; then
     # Critic has no worktree and no branch — it observes only. Remove
     # the archived critique and screenshots so the slug is truly clean.
@@ -105,8 +145,13 @@ echo "cancelled $role $slug:"
 case "$role" in
     lightweight)
         echo "  - killed tmux window nimbus-workers:${slug}-light"
-        echo "  - restored main checkout to 'main'"
-        echo "  - force-deleted branch $branch"
+        case "$revert_status" in
+            reverted)     echo "  - reverted commits $start_sha..HEAD on main" ;;
+            no-commits)   echo "  - no commits to revert (HEAD == start_sha)" ;;
+            conflict)     echo "  - REVERT FAILED — resolve manually before reusing this slug" ;;
+            no-start-sha) echo "  - no start_sha recorded; commits (if any) left on main" ;;
+            *)            echo "  - revert: $revert_status" ;;
+        esac
         ;;
     critic)
         echo "  - killed tmux window nimbus-workers:${slug}-crit"
@@ -119,6 +164,9 @@ case "$role" in
         echo "  - force-deleted branch $branch"
         ;;
 esac
+if (( wip_stashed )); then
+    echo "  - stashed uncommitted WIP as '$wip_stash_msg' (recover via: git stash list)"
+fi
 echo "  - mailbox cleared, state set to cancelled"
 echo
 case "$role" in
