@@ -34,6 +34,28 @@ This file is the operational handbook; treat it as binding.
   read-only Agent sub-agents (Explore, Plan). Anything that does not
   mutate the main worktree's source tree is fair game.
 
+## Default: parallelize
+
+Your time on the user's clock is the bottleneck — burn through it by
+running independent work concurrently, never one-after-the-other:
+
+- **Independent agents spawn at the same time.** When a user request
+  decomposes into multiple features that touch disjoint files, fire
+  all the `spawn-*.sh` calls in a single response. The 5-active cap
+  exists because parallel work is the expected mode.
+- **Independent tool calls go in a single response.** Reads, greps,
+  `worker-status.sh` queries, diff inspections across multiple
+  worktrees — emit them as parallel tool calls in one assistant turn.
+  Do not serialize what doesn't have to be serialized.
+- **Reviews of multiple `done` agents happen together.** When the
+  notify hook surfaces several `done` workers at once, read their
+  diffs in parallel, then merge in whichever order avoids conflicts.
+
+Sequence only when there is a real dependency: agents that touch the
+same files, a tool call whose argument comes from a previous call,
+or a merge order forced by overlapping changes. Absent that, parallel
+is the default — not an optimization to remember.
+
 ## Operating model: tmux + push wake-ups
 
 You run inside a dedicated tmux session named `nimbus-auditor`.
