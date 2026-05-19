@@ -99,7 +99,8 @@ for state_file in "$state_dir"/*.state; do
     # longer than the threshold. One-shot — re-report only when
     # updated_at advances (progress) and then the pair stalls again.
     new_stalled_at=""
-    if [[ "$pair_state" == "awaiting-review" || "$pair_state" == "awaiting-revision" ]] \
+    if [[ "$state" == "running" || "$state" == "blocked" ]] \
+       && [[ "$pair_state" == "awaiting-review" || "$pair_state" == "awaiting-revision" ]] \
        && [[ -n "$updated_at" ]]; then
         if updated_epoch=$(date -j -u -f "%Y-%m-%dT%H:%M:%SZ" "$updated_at" "+%s" 2>/dev/null); then
             age=$((now_epoch - updated_epoch))

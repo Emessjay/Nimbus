@@ -40,16 +40,19 @@ now_epoch=$(date -u +%s)
 shopt -s nullglob
 for state_file in "$state_dir"/*.state; do
     slug=""
+    state=""
     pair_state=""
     updated_at=""
     while IFS='=' read -r k v; do
         case "$k" in
             slug)       slug="$v" ;;
+            state)      state="$v" ;;
             pair_state) pair_state="$v" ;;
             updated_at) updated_at="$v" ;;
         esac
     done < "$state_file"
     [[ -z "$slug" ]] && continue
+    [[ "$state" != "running" && "$state" != "blocked" ]] && continue
     [[ "$pair_state" != "awaiting-review" && "$pair_state" != "awaiting-revision" ]] && continue
     [[ -z "$updated_at" ]] && continue
 
