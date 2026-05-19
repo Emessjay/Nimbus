@@ -33,10 +33,14 @@ state_dir="$main_repo/.auditor-state"
 if [[ -z "$slug" ]]; then
     shopt -s nullglob
     for sf in "$state_dir"/*.state; do
-        role=$(grep '^role=' "$sf" | head -1 | cut -d= -f2-)
-        s=$(grep '^state=' "$sf" | head -1 | cut -d= -f2-)
+        s=$(grep '^state=' "$sf" | head -1 | cut -d= -f2- || true)
+        case "$s" in
+            running|blocked) ;;
+            *) continue ;;
+        esac
+        role=$(grep '^role=' "$sf" | head -1 | cut -d= -f2- || true)
         if [[ "$role" == "critic" && "$s" == "running" ]]; then
-            slug=$(grep '^slug=' "$sf" | head -1 | cut -d= -f2-)
+            slug=$(grep '^slug=' "$sf" | head -1 | cut -d= -f2- || true)
             break
         fi
     done
@@ -55,9 +59,9 @@ if [[ ! -f "$state_file" ]]; then
     exit 1
 fi
 
-role=$(grep '^role=' "$state_file" | head -1 | cut -d= -f2-)
+role=$(grep '^role=' "$state_file" | head -1 | cut -d= -f2- || true)
 if [[ "$role" != "critic" ]]; then
-    echo "error: state file says role=$role, expected critic" >&2
+    echo "error: state file says role=${role:-<missing>}, expected critic" >&2
     exit 1
 fi
 

@@ -27,9 +27,9 @@ if [[ ! -f "$state_file" ]]; then
     exit 1
 fi
 
-role=$(grep '^role=' "$state_file" | head -1 | cut -d= -f2-)
+role=$(grep '^role=' "$state_file" | head -1 | cut -d= -f2- || true)
 if [[ "$role" != "lightweight" ]]; then
-    echo "error: $slug has role=$role, not lightweight; use merge-worker.sh" >&2
+    echo "error: $slug has role=${role:-<missing>}, not lightweight; use merge-worker.sh" >&2
     exit 1
 fi
 

@@ -95,10 +95,18 @@ mkdir -p "$state_dir"
 # 5-worker and 1-lightweight caps.
 shopt -s nullglob
 for sf in "$state_dir"/*.state; do
-    role=$(grep '^role=' "$sf" | head -1 | cut -d= -f2-)
-    s=$(grep '^state=' "$sf" | head -1 | cut -d= -f2-)
-    if [[ "$role" == "critic" && ( "$s" == "running" || "$s" == "blocked" ) ]]; then
-        existing=$(grep '^slug=' "$sf" | head -1 | cut -d= -f2-)
+    # Skip terminal-state files first — they're noise for this cap
+    # check AND they predate fields like `role=` in legacy projects,
+    # so reading role would trip pipefail. `|| true` is belt-and-braces
+    # on the state lookup itself for the same reason.
+    s=$(grep '^state=' "$sf" | head -1 | cut -d= -f2- || true)
+    case "$s" in
+        running|blocked) ;;
+        *) continue ;;
+    esac
+    role=$(grep '^role=' "$sf" | head -1 | cut -d= -f2- || true)
+    if [[ "$role" == "critic" ]]; then
+        existing=$(grep '^slug=' "$sf" | head -1 | cut -d= -f2- || true)
         echo "error: critic '$existing' is already $s (cap is 1)" >&2
         echo "       merge, cancel, or wait for it to finish first." >&2
         exit 1
