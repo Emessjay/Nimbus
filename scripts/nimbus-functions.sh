@@ -100,6 +100,65 @@ __nimbus_start_stall_sweeper() {
     disown 2>/dev/null || true
 }
 
+# Hold off macOS idle / system sleep while the auditor is running so
+# workers, debuggers, lightweights, and the auditor itself keep making
+# progress when the user steps away (screensaver, display sleep, idle
+# sleep on battery). On AC, the default pmset profile already disables
+# idle sleep, but on battery macOS will suspend the laptop after one
+# minute idle by default — which kills every active claude process.
+#
+# We use `caffeinate -i -s` (prevent idle sleep, prevent system sleep
+# on AC) running as a long-lived background process. The pidfile lives
+# in $home_repo/.auditor-state so it's torn down by nimbus-audit-stop;
+# the loop also self-terminates when the auditor tmux session dies, so
+# orphaned caffeinate processes don't linger.
+#
+# Note: closing a MacBook's lid (clamshell mode) still puts the system
+# to sleep unless an external display + power are attached. caffeinate
+# cannot override clamshell sleep. Either keep the lid open or attach
+# an external display while the auditor is running.
+__nimbus_start_caffeinate() {
+    local home_repo="$1"
+    local state_dir="$home_repo/.auditor-state"
+    [[ -d "$state_dir" ]] || return 0
+    command -v caffeinate >/dev/null 2>&1 || return 0
+    local pidfile="$state_dir/.caffeinate.pid"
+    if [[ -f "$pidfile" ]]; then
+        local existing
+        existing=$(cat "$pidfile" 2>/dev/null)
+        if [[ -n "$existing" ]] && kill -0 "$existing" 2>/dev/null; then
+            return 0
+        fi
+    fi
+    # Supervisor subshell: spawn caffeinate, then poll the tmux session.
+    # The EXIT trap kills caffeinate whether the loop exits cleanly
+    # (tmux gone) or we kill the supervisor PID directly. Net effect:
+    # whichever way the auditor goes away, the keepalive goes with it.
+    (
+        trap 'kill $cpid 2>/dev/null' EXIT
+        caffeinate -i -s &
+        cpid=$!
+        while tmux has-session -t nimbus-auditor 2>/dev/null; do
+            sleep 30
+        done
+    ) >/dev/null 2>&1 &
+    echo "$!" > "$pidfile"
+    disown 2>/dev/null || true
+}
+
+__nimbus_stop_caffeinate() {
+    local home_repo="$1"
+    local pidfile="$home_repo/.auditor-state/.caffeinate.pid"
+    [[ -f "$pidfile" ]] || return 0
+    local pid
+    pid=$(cat "$pidfile" 2>/dev/null)
+    rm -f "$pidfile"
+    [[ -n "$pid" ]] || return 0
+    # Killing the supervisor triggers its EXIT trap, which reaps the
+    # caffeinate child.
+    kill "$pid" 2>/dev/null || true
+}
+
 
 # Boot or attach to the auditor. The auditor runs inside a dedicated
 # tmux session (`nimbus-auditor`) so worker/debugger/lightweight/critic
@@ -138,10 +197,12 @@ nimbus-audit() {
     local session="nimbus-auditor"
     if tmux has-session -t "$session" 2>/dev/null; then
         __nimbus_start_stall_sweeper "$home_repo"
+        __nimbus_start_caffeinate "$home_repo"
         tmux attach -t "$session"
         return
     fi
     __nimbus_start_stall_sweeper "$home_repo"
+    __nimbus_start_caffeinate "$home_repo"
     local task="$*"
     local prompt='**read $NIMBUS_HOME/AUDITOR.md before you act — you orchestrate other agents, you do not code yourself**
 
@@ -191,10 +252,12 @@ nimbus-audit-resume() {
     if tmux has-session -t "$session" 2>/dev/null; then
         echo "auditor session already running; attaching."
         __nimbus_start_stall_sweeper "$home_repo"
+        __nimbus_start_caffeinate "$home_repo"
         tmux attach -t "$session"
         return
     fi
     __nimbus_start_stall_sweeper "$home_repo"
+    __nimbus_start_caffeinate "$home_repo"
     tmux new-session -A -s "$session" -n auditor \
         -e NIMBUS_ROLE=auditor \
         -e NIMBUS_HOME="$NIMBUS_HOME" \
@@ -256,6 +319,8 @@ nimbus-audit-stop() {
         tmux kill-session -t nimbus-workers 2>/dev/null || true
         tmux kill-session -t nimbus-auditor 2>/dev/null || true
     fi
+
+    __nimbus_stop_caffeinate "$home_repo"
 
     if (( hard )); then
         echo "auditor stopped (hard): all subagents cancelled, tmux sessions killed."

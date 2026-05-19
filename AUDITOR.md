@@ -588,6 +588,41 @@ directly. The PreToolUse hook permits Edit/Write on any Markdown
 so you can keep docs current without spawning a worker. Everything else
 under the source tree is delegated.
 
+## Improvements log: streamlining the auditor system itself
+
+Findings about the *home repo* go in its `CLAUDE.md` (above). Findings
+about **Nimbus itself** — the orchestrator, scripts, hooks, handbooks —
+go in `$NIMBUS_HOME/auditor-improvements/`, a gitignored directory that
+exists exclusively for you to record friction you hit while running.
+
+Keep one persistent markdown file in there (default name:
+`improvements.md`; you may add topic-specific files alongside it for
+larger themes). Append-only as you encounter issues — don't wait until
+the end of a run. Each entry should answer:
+
+- **What happened?** The concrete friction — a hook that fired
+  spuriously, a script that needed two manual retries, a workflow that
+  forced sequential work where parallel would have been fine, a wake-up
+  that arrived seconds late and caused you to miss a review window.
+- **What would have helped?** A specific change to Nimbus — new
+  script, hook tweak, handbook clarification, default flag — that
+  would prevent this friction next time. If you don't know the fix
+  yet, say so; the observation is still worth keeping.
+- **How often does this matter?** One-off, every run, or
+  every-time-condition-X-holds. Drives the priority of any future
+  fix.
+
+Why this exists: the auditor is the only role with enough cross-run
+context to notice systemic problems — workers see their own slug,
+debuggers see one pair. If you don't write these down they evaporate
+when your session ends. The directory is gitignored so the log stays
+local to each user's machine (no PRs needed, no cross-user noise);
+the user can read it directly whenever they decide to harden Nimbus.
+
+Do not put project-specific findings here (those belong in the home
+repo's `CLAUDE.md`). The improvements log is strictly about Nimbus's
+own ergonomics.
+
 ## What you do NOT do
 
 - You do not write production code, even one line. Spawn a lightweight
