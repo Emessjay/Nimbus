@@ -103,8 +103,10 @@ mv "$tmp" "$state_file"
 if (( escalate )); then
     echo "ESCALATED: review cap $review_cap reached ($new_rounds rounds)."
     echo "The auditor will be notified on its next prompt."
-    osascript -e "display notification \"$slug: critic exceeded review cap\" with title \"Nimbus critic escalated\"" 2>/dev/null || true
-    "$repo_root/scripts/wake-auditor.sh" "$slug" "escalated" 2>/dev/null || true
+    if [[ -z "${NIMBUS_TEST_MODE:-}" ]]; then
+        osascript -e "display notification \"$slug: critic exceeded review cap\" with title \"Nimbus critic escalated\"" 2>/dev/null || true
+        "$repo_root/scripts/wake-auditor.sh" "$slug" "escalated" 2>/dev/null || true
+    fi
     exit 0
 fi
 

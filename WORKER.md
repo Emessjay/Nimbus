@@ -74,6 +74,13 @@ You operate at `medium` effort by default. The auditor's `high` budget
 is reserved for orchestration and review; yours is reserved for actually
 shipping the work. Don't try to second-guess the split.
 
+## Testing lifecycle scripts
+
+If you write a self-test that exercises `worker-done.sh` or
+`worker-blocked.sh`, export `NIMBUS_TEST_MODE=1` so the test runs
+without pasting wake-up prompts into the live auditor session or
+triggering macOS notifications.
+
 ## Out of scope for you
 
 - Discussing project-level priorities with the user. Address them

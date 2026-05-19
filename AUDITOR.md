@@ -421,6 +421,17 @@ a background loop that runs
 every 60 seconds and pushes a `stalled` wake-up into the auditor's
 tmux session for each newly stalled pair.
 
+### Suppressing notifications in self-tests
+
+When verification suites exercise the lifecycle scripts end-to-end
+(fake workers, handoffs, approvals, etc.) they would otherwise spam the
+live auditor session with phantom wake-ups and macOS toasts. Set
+`NIMBUS_TEST_MODE` to any non-empty value before running the scripts to
+suppress both side effects. State-file writes, review-log appends, and
+all other behaviour remain active — only the `wake-auditor.sh` call and
+the `osascript` toast are skipped. Unset or empty `NIMBUS_TEST_MODE`
+restores the full notification path.
+
 ## Review checklist
 
 Apply this to every diff before merging — workers, pairs, and

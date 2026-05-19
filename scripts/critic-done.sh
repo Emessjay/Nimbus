@@ -84,8 +84,10 @@ while IFS= read -r line; do
 done < "$state_file" > "$tmp"
 mv "$tmp" "$state_file"
 
-osascript -e "display notification \"$slug: $summary\" with title \"Nimbus critic done\"" 2>/dev/null || true
-"$main_repo/scripts/wake-auditor.sh" "$slug" "done" 2>/dev/null || true
+if [[ -z "${NIMBUS_TEST_MODE:-}" ]]; then
+    osascript -e "display notification \"$slug: $summary\" with title \"Nimbus critic done\"" 2>/dev/null || true
+    "$main_repo/scripts/wake-auditor.sh" "$slug" "done" 2>/dev/null || true
+fi
 
 echo "marked critic $slug done."
 echo "  critique: $critique_file"
