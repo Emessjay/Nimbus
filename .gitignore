@@ -1,1 +1,3 @@
 .auditor-state/
+auditor-improvements/*
+!auditor-improvements/.gitkeep
