@@ -400,6 +400,27 @@ The hook is scoped to `NIMBUS_ROLE=auditor`, so agent sessions don't
 see their own transitions. `list-workers.sh` is still available for
 explicit queries.
 
+### Stall detector
+
+A pair handed off to its debugger sits in `pair_state=awaiting-review`
+until the debugger replies; if the debugger never responds, no push
+wake-up ever fires and the auditor would otherwise stay blind. The
+notify hook also reports any pair whose `pair_state` has been
+`awaiting-review` or `awaiting-revision` for more than 15 minutes
+since `updated_at`:
+
+    pair critic-tier stalled: awaiting-review for 23m (debugger has not responded)
+    pair foo stalled: awaiting-revision for 18m (worker has not picked up revisions)
+
+Each stall is reported once per `updated_at` value, so a pair that
+makes progress and then re-stalls produces a fresh report. To
+actively learn about stalls without waiting for a user prompt, the
+auditor session boot (`nimbus-audit` / `nimbus-audit-resume`) starts
+a background loop that runs
+[scripts/check-stalled-pairs.sh](scripts/check-stalled-pairs.sh)
+every 60 seconds and pushes a `stalled` wake-up into the auditor's
+tmux session for each newly stalled pair.
+
 ## Review checklist
 
 Apply this to every diff before merging — workers, pairs, and
