@@ -87,17 +87,18 @@ You have four spawn options. Pick the cheapest that fits:
 | pair         | Iterative work, UI, refactor with many touchpoints, real test suite                   | `./scripts/spawn-pair.sh`               |
 | critic       | Visual review of a merged feature; the critic uses the app and reports back           | `./scripts/spawn-critic.sh`             |
 
-- **lightweight** runs in the main checkout on `fix/<slug>` (no
-  worktree), at Sonnet + medium effort. Use it for *any* quick fix
-  you're confident in the framing of — typos, copy tweaks, config
-  one-liners, small targeted bug fixes, missing imports, constants,
-  CSS-color changes. The disqualifiers are needing test runs, needing
-  iteration, or touching many files — those become workers. The main
-  checkout switches branches while the lightweight is alive;
-  `merge-lightweight.sh` restores it. Cap: 1 concurrent. If a
-  lightweight discovers the task is bigger than it looked, it escalates
-  via `lightweight-blocked.sh` rather than silently turning into a
-  worker.
+- **lightweight** runs in the main checkout directly on `main` (no
+  worktree, no feature branch), at Sonnet + medium effort. Use it for
+  *any* quick fix you're confident in the framing of — typos, copy
+  tweaks, config one-liners, small targeted bug fixes, missing imports,
+  constants, CSS-color changes. The disqualifiers are needing test
+  runs, needing iteration, or touching many files — those become
+  workers. Because commits land on `main` immediately, anything the
+  lightweight writes is visible to the rest of the system right away;
+  cancel uses `git revert` to undo non-destructively. Cap: 1
+  concurrent. If a lightweight discovers the task is bigger than it
+  looked, it escalates via `lightweight-blocked.sh` rather than
+  silently turning into a worker.
 - **worker** is the existing tier: dedicated worktree at
   `../nimbus-<slug>/`, Opus, medium effort by default, single
   auditor review at the end. Cap: 5 concurrent (pairs count as one).
@@ -304,8 +305,9 @@ turn of a new auditor process. For each orphaned worker, decide and
 propose to the user:
 
 - **Resume.** Run `nimbus-worker-resume <slug>` if the work is
-  still relevant. (Lightweights are *not* resume-friendly — cancel
-  and respawn instead.)
+  still relevant. (Works for all tiers, including lightweights, whose
+  resume re-attaches the tmux window without touching the main
+  checkout's branch.)
 - **Cancel.** Run `./scripts/cancel-worker.sh <slug>` if the task is
   no longer relevant or the work is unsalvageable.
 
@@ -347,20 +349,25 @@ When an agent reports `done`:
 7. **Review.** Inspect with `./scripts/worker-status.sh <slug>`. For
    pairs, also read `.auditor-state/<slug>.review.log` to sample what
    was contested. Read the diff with `git -C ../nimbus-<slug> diff
-   main...HEAD` (workers/pairs) or `git diff main..fix/<slug>`
-   (lightweights — the main checkout is still on the branch). Apply
-   the review checklist below.
+   main...HEAD` for workers/pairs. For lightweights, read
+   `start_sha` from `.auditor-state/<slug>.state` and use
+   `git log $start_sha..HEAD` / `git diff $start_sha..HEAD` — the
+   lightweight's commits are already on `main`. Apply the review
+   checklist below.
 8. **Decide.** If the work passes, run the appropriate merge:
    `./scripts/merge-worker.sh <slug>` for workers and pairs,
-   `./scripts/merge-lightweight.sh <slug>` for lightweights. If not,
-   run `./scripts/talk-to-worker.sh <slug> "<feedback>"`.
+   `./scripts/merge-lightweight.sh <slug>` for lightweights (a pure
+   state transition; the commits are already on `main`). If not, run
+   `./scripts/talk-to-worker.sh <slug> "<feedback>"`.
 
-   The merge is guaranteed to be a fast-forward: the worker /
-   debugger / lightweight done-handler integrates `main` into its
-   branch *before* flipping state, so by the time you see `done` the
-   branch already contains every commit on `main`. If that merge
-   conflicted, the agent stayed in `running` and never notified you —
-   you will not be asked to resolve worker-vs-main conflicts.
+   For workers and pairs the merge is guaranteed to be a
+   fast-forward: the worker / debugger done-handler integrates `main`
+   into its branch *before* flipping state, so by the time you see
+   `done` the branch already contains every commit on `main`. If that
+   merge conflicted, the agent stayed in `running` and never notified
+   you — you will not be asked to resolve worker-vs-main conflicts.
+   Lightweights have no separate branch to integrate, so no
+   pre-flip merge step applies.
 
 When an agent reports `blocked`:
 
