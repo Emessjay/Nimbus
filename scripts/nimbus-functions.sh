@@ -306,11 +306,13 @@ nimbus-worker-resume() {
         return 1
     fi
 
-    local worktree_path session_id mailbox queued effort
+    local worktree_path session_id mailbox queued effort role
     worktree_path=$(grep '^worktree_path=' "$state_file" | head -1 | cut -d= -f2-)
     session_id=$(grep '^session_id=' "$state_file" | head -1 | cut -d= -f2-)
     effort=$(grep '^effort=' "$state_file" | head -1 | cut -d= -f2-)
     effort="${effort:-medium}"
+    role=$(grep '^role=' "$state_file" | head -1 | cut -d= -f2-)
+    role="${role:-worker}"
     mailbox="$main_repo/.auditor-state/$slug.mailbox"
 
     if [[ -z "$session_id" ]]; then
@@ -320,6 +322,19 @@ nimbus-worker-resume() {
     if [[ ! -d "$worktree_path" ]]; then
         echo "error: worktree $worktree_path is gone; was it merged?" >&2
         return 1
+    fi
+
+    # Lightweights operate in the main checkout on `main`. There's no
+    # branch to check out at resume time, but paranoia: refuse to resume
+    # if some other state change moved the main checkout off `main`.
+    if [[ "$role" == "lightweight" ]]; then
+        local current_branch
+        current_branch=$(git -C "$worktree_path" branch --show-current 2>/dev/null || true)
+        if [[ "$current_branch" != "main" ]]; then
+            echo "error: lightweight $slug expects main checkout on 'main', but it is on '$current_branch'" >&2
+            echo "       resolve the main checkout's state, then retry." >&2
+            return 1
+        fi
     fi
 
     # Drain mailbox; if non-empty, prepend it to the resume prompt.

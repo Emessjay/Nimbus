@@ -187,15 +187,16 @@ Your task:
 
 $task
 
-You are NOT in a worktree. You operate in the main checkout on branch
-fix/$slug. Touch only the files the brief names. If the task is bigger
+You are NOT in a worktree. You operate in the main checkout, directly
+on \`main\` — there is no separate branch protecting main from your
+commits. Touch only the files the brief names. If the task is bigger
 than a few lines or needs tests, stop and run:
     ./scripts/lightweight-blocked.sh \"scope grew, needs a worker\"
 
-When done, commit on your fix/$slug branch and run:
+When done, commit your work directly to \`main\` and run:
     ./scripts/lightweight-done.sh \"<one-line summary>\"
-The auditor will fast-forward your branch into main with
-merge-lightweight.sh."
+The auditor will accept your commits with merge-lightweight.sh (which
+is now a state transition, since your commits are already on main)."
         ;;
     critic)
         prompt="**read $claude_md_path and $nimbus_home/CRITIC.md before you act — you review the UI as a user, never reading source code**

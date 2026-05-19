@@ -53,6 +53,7 @@ for state_file in "${state_files[@]}"; do
     pair_state=$(grep '^pair_state=' "$state_file" | head -1 | cut -d= -f2- || true)
     review_rounds=$(grep '^review_rounds=' "$state_file" | head -1 | cut -d= -f2- || true)
     review_cap=$(grep '^review_cap=' "$state_file" | head -1 | cut -d= -f2- || true)
+    start_sha=$(grep '^start_sha=' "$state_file" | head -1 | cut -d= -f2- || true)
 
     if [[ "$show_all" -eq 0 && ( "$state" == "merged" || "$state" == "cancelled" ) ]]; then
         continue
@@ -69,11 +70,21 @@ for state_file in "${state_files[@]}"; do
         rounds="${review_rounds:-0}/${review_cap:-?}"
     fi
 
-    # Count commits ahead of main. Critics have no branch, so they
-    # render as "-".
+    # Count commits the agent has authored. Critics have no branch, so
+    # they render as "-". Lightweights commit directly to main; their
+    # contribution is start_sha..HEAD (an additive field — missing on
+    # state files from before the lightweight-no-branch refactor, in
+    # which case we fall back to 0).
     ahead="-"
     if [[ "$kind" == "critic" ]]; then
         : # no branch
+    elif [[ "$kind" == "lightweight" ]]; then
+        if [[ -n "$start_sha" ]] \
+           && git -C "$repo_root" rev-parse --verify "$start_sha" >/dev/null 2>&1; then
+            ahead=$(git -C "$repo_root" rev-list --count "$start_sha..HEAD" 2>/dev/null || echo "?")
+        else
+            ahead="0"
+        fi
     elif git -C "$repo_root" rev-parse --verify "$branch" >/dev/null 2>&1; then
         ahead=$(git -C "$repo_root" rev-list --count "main..$branch" 2>/dev/null || echo "?")
     fi
@@ -111,13 +122,8 @@ for state_file in "${state_files[@]}"; do
     fi
     if [[ "$state" == "orphaned" ]]; then
         echo "    orphaned: auditor exited while this $kind was active"
-        if [[ "$role" == "lightweight" ]]; then
-            echo "      lightweights are not resume-friendly; cancel and respawn:"
-            echo "      cancel: ./scripts/cancel-worker.sh $slug"
-        else
-            echo "      resume: nimbus-worker-resume $slug"
-            echo "      cancel: ./scripts/cancel-worker.sh $slug"
-        fi
+        echo "      resume: nimbus-worker-resume $slug"
+        echo "      cancel: ./scripts/cancel-worker.sh $slug"
     fi
     mailbox="$state_dir/$slug.mailbox"
     if [[ -s "$mailbox" ]]; then
