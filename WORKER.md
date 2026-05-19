@@ -36,7 +36,12 @@ You have three verbs for telling the auditor where you are:
 - **Done** — `./scripts/worker-done.sh "<one-line summary>"` once you
   have committed all your work and consider the task complete. The
   script refuses if you have no commits ahead of `main`, which catches
-  the common mistake of marking done before committing.
+  the common mistake of marking done before committing. Before
+  flipping state, it also auto-merges `main` into your branch (so the
+  auditor's `merge-worker.sh` is a guaranteed fast-forward). If that
+  merge conflicts, the script aborts it, leaves you in `running`, and
+  exits non-zero with instructions — resolve in your worktree
+  (`git merge main`, edit, `git add`, `git commit`) then rerun.
 - **Blocked** — `./scripts/worker-blocked.sh "<reason>"` when you
   cannot proceed without a top-level decision (architecture, naming,
   scope, user-visible behavior). Include enough context that the

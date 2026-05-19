@@ -77,7 +77,11 @@ The spec is the contract.
   Declare the pair done. This sets `state=done`; the auditor sees a
   normal `worker <slug> done` notification and runs `merge-worker.sh`
   next. The auditor is the final reviewer; your approval does not
-  bypass merge.
+  bypass merge. Before flipping state, the script auto-merges `main`
+  into the branch so the auditor's merge is a guaranteed
+  fast-forward. If that merge conflicts, state stays `running` and
+  the script exits non-zero with resolve-then-rerun instructions —
+  coordinate with the worker to resolve in the pair's worktree.
 
 - **Block (escalate)** — `./scripts/debugger-blocked.sh "<reason>"`
   Use when the work cannot be judged against the spec — spec has a
