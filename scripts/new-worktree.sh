@@ -7,7 +7,8 @@
 # Usage:
 #   ./scripts/new-worktree.sh <slug>
 #
-# Creates ../nimbus-<slug> on branch feature/<slug>.
+# Creates <home_repo_path>-<slug> (sibling of the main checkout) on
+# branch feature/<slug>.
 
 set -euo pipefail
 
@@ -18,7 +19,7 @@ fi
 
 slug="$1"
 repo_root="$(git rev-parse --show-toplevel)"
-worktree_path="${repo_root%/*}/nimbus-${slug}"
+worktree_path="${repo_root}-${slug}"
 branch="feature/${slug}"
 
 if [[ -e "$worktree_path" ]]; then

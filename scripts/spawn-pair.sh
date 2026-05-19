@@ -83,6 +83,17 @@ repo_root="$(git rev-parse --show-toplevel)"
 state_dir="$repo_root/.auditor-state"
 mkdir -p "$state_dir"
 
+# Resolve Nimbus's own checkout (where new-worktree.sh / nimbus-worker.sh
+# live) early. Fail fast if the binaries we depend on aren't there.
+nimbus_home="${NIMBUS_HOME:-$(cd "$repo_root" && pwd)}"
+for required in new-worktree.sh nimbus-worker.sh; do
+    if [[ ! -x "$nimbus_home/scripts/$required" ]]; then
+        echo "error: $required missing or not executable at $nimbus_home/scripts/$required" >&2
+        echo "       check that NIMBUS_HOME points at a Nimbus checkout." >&2
+        exit 1
+    fi
+done
+
 # REQUIRE the spec file. The debugger reviews against the spec; without
 # one, it would have to invent its own bar.
 spec_file="$state_dir/$slug.spec.md"
@@ -129,11 +140,11 @@ if [[ -f "$state_dir/$slug.state" ]]; then
     fi
 fi
 
-worktree_path="${repo_root%/*}/nimbus-${slug}"
+worktree_path="${repo_root}-${slug}"
 branch="feature/${slug}"
 
 if [[ ! -d "$worktree_path" ]]; then
-    "$repo_root/scripts/new-worktree.sh" "$slug"
+    "$nimbus_home/scripts/new-worktree.sh" "$slug"
 fi
 
 session_id=$(uuidgen | tr '[:upper:]' '[:lower:]')
@@ -165,8 +176,8 @@ rm -f "$state_dir/$slug.mailbox"
 : > "$state_dir/$slug.review.log"
 
 tmux_session="nimbus-workers"
-worker_cmd="$repo_root/scripts/nimbus-worker.sh --role worker $slug"
-debugger_cmd="$repo_root/scripts/nimbus-worker.sh --role debugger $slug"
+worker_cmd="$nimbus_home/scripts/nimbus-worker.sh --role worker $slug"
+debugger_cmd="$nimbus_home/scripts/nimbus-worker.sh --role debugger $slug"
 
 # Kill stale windows.
 for w in "$slug" "${slug}-dbg"; do
@@ -174,8 +185,6 @@ for w in "$slug" "${slug}-dbg"; do
         tmux kill-window -t "$tmux_session:$w" 2>/dev/null || true
     fi
 done
-
-nimbus_home="${NIMBUS_HOME:-$(cd "$repo_root" && pwd)}"
 
 if tmux has-session -t "$tmux_session" 2>/dev/null; then
     tmux new-window -t "$tmux_session:" -n "$slug" -c "$worktree_path" -e NIMBUS_HOME="$nimbus_home" "$worker_cmd"
