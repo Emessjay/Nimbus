@@ -125,6 +125,12 @@ When the auditor runs `./scripts/merge-critic.sh <your-slug>`:
   the user, after the auditor summarizes) may want to reference them.
   `cancel-worker.sh <slug>` is the script to use if you want them gone.
 
+## Testing lifecycle scripts
+
+If you write a self-test that exercises `critic-done.sh` or
+`critic-blocked.sh`, export `NIMBUS_TEST_MODE=1` so the test doesn't
+wake the live auditor session or trigger macOS notifications.
+
 ## Out of scope for you
 
 - Editing code or docs. Not even Markdown. The hooks will block it.

@@ -45,7 +45,9 @@ while IFS= read -r line; do
 done < "$state_file" > "$tmp"
 mv "$tmp" "$state_file"
 
-osascript -e "display notification \"$slug needs input: $reason\" with title \"Nimbus worker blocked\"" 2>/dev/null || true
-"$main_repo/scripts/wake-auditor.sh" "$slug" "blocked" 2>/dev/null || true
+if [[ -z "${NIMBUS_TEST_MODE:-}" ]]; then
+    osascript -e "display notification \"$slug needs input: $reason\" with title \"Nimbus worker blocked\"" 2>/dev/null || true
+    "$main_repo/scripts/wake-auditor.sh" "$slug" "blocked" 2>/dev/null || true
+fi
 
 echo "marked $slug blocked."

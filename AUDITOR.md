@@ -400,6 +400,17 @@ The hook is scoped to `NIMBUS_ROLE=auditor`, so agent sessions don't
 see their own transitions. `list-workers.sh` is still available for
 explicit queries.
 
+### Suppressing notifications in self-tests
+
+When verification suites exercise the lifecycle scripts end-to-end
+(fake workers, handoffs, approvals, etc.) they would otherwise spam the
+live auditor session with phantom wake-ups and macOS toasts. Set
+`NIMBUS_TEST_MODE` to any non-empty value before running the scripts to
+suppress both side effects. State-file writes, review-log appends, and
+all other behaviour remain active — only the `wake-auditor.sh` call and
+the `osascript` toast are skipped. Unset or empty `NIMBUS_TEST_MODE`
+restores the full notification path.
+
 ## Review checklist
 
 Apply this to every diff before merging — workers, pairs, and

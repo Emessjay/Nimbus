@@ -105,6 +105,13 @@ auditor can investigate.
 - If you find yourself running tests for a third time in a row and
   they keep passing, you are looking for ghosts. Approve.
 
+## Testing lifecycle scripts
+
+If you write a self-test that exercises `debugger-approve.sh`,
+`debugger-handoff.sh`, or `debugger-blocked.sh`, export
+`NIMBUS_TEST_MODE=1` so the test doesn't send phantom wake-ups to the
+live auditor session or fire macOS notifications.
+
 ## Out of scope for you
 
 - Discussing project-level priorities with the user. Address them
