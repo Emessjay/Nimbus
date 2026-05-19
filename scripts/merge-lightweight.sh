@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
-# Fast-forward a done lightweight's branch into main, kill its tmux
-# window, and delete the branch. Restores the main checkout to 'main'.
+# Accept a done lightweight. There is no branch to fast-forward and no
+# checkout to restore — the lightweight committed directly to `main`,
+# so this is purely a state transition: state=done → state=merged,
+# tmux window killed, mailbox dropped.
 #
 # Usage:
-#   ./scripts/merge-lightweight.sh <slug>           # only if state == done
-#   ./scripts/merge-lightweight.sh <slug> --force   # ignore state
+#   ./scripts/merge-lightweight.sh <slug>
 #
 # Run from the main repo root by the auditor.
 
 set -euo pipefail
 
 if [[ $# -lt 1 ]]; then
-    echo "usage: $0 <slug> [--force]" >&2
+    echo "usage: $0 <slug>" >&2
     exit 1
 fi
 
 slug="$1"
-force="${2:-}"
 
 repo_root="$(git rev-parse --show-toplevel)"
 state_dir="$repo_root/.auditor-state"
@@ -33,39 +33,20 @@ if [[ "$role" != "lightweight" ]]; then
     exit 1
 fi
 
-branch=$(grep '^branch=' "$state_file" | head -1 | cut -d= -f2-)
 state=$(grep '^state=' "$state_file" | head -1 | cut -d= -f2-)
-
-if [[ "$state" != "done" && "$force" != "--force" ]]; then
+if [[ "$state" != "done" ]]; then
     echo "error: lightweight state is '$state', not 'done'." >&2
-    echo "       pass --force to merge anyway." >&2
     exit 1
 fi
 
-# Switch to main and fast-forward.
-# The main checkout is currently on fix/<slug> (because spawn-lightweight
-# checked the branch out there); we need to switch back before merging.
-current=$(git -C "$repo_root" branch --show-current)
-if [[ "$current" != "main" && "$current" != "$branch" ]]; then
-    echo "error: main checkout is on '$current', expected '$branch' or 'main'" >&2
-    exit 1
-fi
+start_sha=$(grep '^start_sha=' "$state_file" | head -1 | cut -d= -f2- || true)
+head_sha=$(git -C "$repo_root" rev-parse HEAD)
 
-if ! git -C "$repo_root" diff --quiet || ! git -C "$repo_root" diff --cached --quiet; then
-    echo "error: main checkout has uncommitted changes; commit, stash, or revert before merging" >&2
-    exit 1
-fi
-
-# Kill the lightweight's tmux window first — it's still running on
-# fix/<slug>, and we're about to delete that branch. Letting it sit
-# would leave a confused Claude session in a dead window.
+# Kill the lightweight's tmux window. It's done; leave-running would
+# just leave a dead Claude session.
 if command -v tmux >/dev/null 2>&1; then
     tmux kill-window -t "nimbus-workers:${slug}-light" 2>/dev/null || true
 fi
-
-git -C "$repo_root" checkout main
-git -C "$repo_root" merge --ff-only "$branch"
-git -C "$repo_root" branch -d "$branch"
 
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 tmp=$(mktemp)
@@ -80,4 +61,8 @@ mv "$tmp" "$state_file"
 
 rm -f "$state_dir/$slug.mailbox"
 
-echo "merged lightweight $slug into main; main checkout restored to 'main'."
+if [[ -n "$start_sha" ]]; then
+    echo "accepted lightweight \`$slug\`; commits already on \`main\` from \`$start_sha\` to \`$head_sha\`."
+else
+    echo "accepted lightweight \`$slug\`; commits already on \`main\` (HEAD: \`$head_sha\`)."
+fi
