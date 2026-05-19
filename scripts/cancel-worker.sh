@@ -42,7 +42,7 @@ worktree_path=$(grep '^worktree_path=' "$state_file" | head -1 | cut -d= -f2-)
 # branch may be absent (critics have no branch); tolerate via || true.
 branch=$(grep '^branch=' "$state_file" | head -1 | cut -d= -f2- || true)
 state=$(grep '^state=' "$state_file" | head -1 | cut -d= -f2-)
-role=$(grep '^role=' "$state_file" | head -1 | cut -d= -f2-)
+role=$(grep '^role=' "$state_file" | head -1 | cut -d= -f2- || true)
 role="${role:-worker}"
 pair_mode=$(grep '^pair_mode=' "$state_file" | head -1 | cut -d= -f2- || true)
 start_sha=$(grep '^start_sha=' "$state_file" | head -1 | cut -d= -f2- || true)

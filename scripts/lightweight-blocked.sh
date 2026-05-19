@@ -33,10 +33,14 @@ slug="${NIMBUS_WORKER_SLUG:-}"
 if [[ -z "$slug" ]]; then
     shopt -s nullglob
     for sf in "$state_dir"/*.state; do
-        role=$(grep '^role=' "$sf" | head -1 | cut -d= -f2-)
-        s=$(grep '^state=' "$sf" | head -1 | cut -d= -f2-)
-        if [[ "$role" == "lightweight" && ( "$s" == "running" || "$s" == "blocked" ) ]]; then
-            slug=$(grep '^slug=' "$sf" | head -1 | cut -d= -f2-)
+        s=$(grep '^state=' "$sf" | head -1 | cut -d= -f2- || true)
+        case "$s" in
+            running|blocked) ;;
+            *) continue ;;
+        esac
+        role=$(grep '^role=' "$sf" | head -1 | cut -d= -f2- || true)
+        if [[ "$role" == "lightweight" ]]; then
+            slug=$(grep '^slug=' "$sf" | head -1 | cut -d= -f2- || true)
             break
         fi
     done

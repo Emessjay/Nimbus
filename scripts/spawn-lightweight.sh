@@ -78,12 +78,19 @@ if ! git -C "$repo_root" diff --quiet || ! git -C "$repo_root" diff --cached --q
 fi
 
 # Cap: at most one lightweight active at a time.
+# Skip terminal-state files first — they're noise for this cap check
+# AND they may predate the `role=` field in legacy projects, so reading
+# role would trip pipefail.
 shopt -s nullglob
 for sf in "$state_dir"/*.state; do
-    role=$(grep '^role=' "$sf" | head -1 | cut -d= -f2-)
-    s=$(grep '^state=' "$sf" | head -1 | cut -d= -f2-)
-    if [[ "$role" == "lightweight" && ( "$s" == "running" || "$s" == "blocked" ) ]]; then
-        existing=$(grep '^slug=' "$sf" | head -1 | cut -d= -f2-)
+    s=$(grep '^state=' "$sf" | head -1 | cut -d= -f2- || true)
+    case "$s" in
+        running|blocked) ;;
+        *) continue ;;
+    esac
+    role=$(grep '^role=' "$sf" | head -1 | cut -d= -f2- || true)
+    if [[ "$role" == "lightweight" ]]; then
+        existing=$(grep '^slug=' "$sf" | head -1 | cut -d= -f2- || true)
         echo "error: lightweight '$existing' is already $s (cap is 1)" >&2
         echo "       merge, cancel, or wait for it to finish first." >&2
         exit 1

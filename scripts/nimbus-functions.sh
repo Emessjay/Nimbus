@@ -376,7 +376,7 @@ nimbus-worker-resume() {
     session_id=$(grep '^session_id=' "$state_file" | head -1 | cut -d= -f2-)
     effort=$(grep '^effort=' "$state_file" | head -1 | cut -d= -f2-)
     effort="${effort:-medium}"
-    role=$(grep '^role=' "$state_file" | head -1 | cut -d= -f2-)
+    role=$(grep '^role=' "$state_file" | head -1 | cut -d= -f2- || true)
     role="${role:-worker}"
     mailbox="$main_repo/.auditor-state/$slug.mailbox"
 
