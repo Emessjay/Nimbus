@@ -40,10 +40,12 @@ printf "%-28s %-12s %-10s %-32s %-7s %-7s %-8s\n" "SLUG" "KIND" "STATE" "BRANCH"
 for state_file in "${state_files[@]}"; do
     slug=$(grep '^slug=' "$state_file" | head -1 | cut -d= -f2-)
     state=$(grep '^state=' "$state_file" | head -1 | cut -d= -f2-)
-    branch=$(grep '^branch=' "$state_file" | head -1 | cut -d= -f2-)
+    # branch may be absent (critic state files don't write it); tolerate
+    # via || true so set -e / pipefail doesn't kill the loop.
+    branch=$(grep '^branch=' "$state_file" | head -1 | cut -d= -f2- || true)
     spawned=$(grep '^spawned_at=' "$state_file" | head -1 | cut -d= -f2-)
-    summary=$(grep '^summary=' "$state_file" | head -1 | cut -d= -f2-)
-    blocked_reason=$(grep '^blocked_reason=' "$state_file" | head -1 | cut -d= -f2-)
+    summary=$(grep '^summary=' "$state_file" | head -1 | cut -d= -f2- || true)
+    blocked_reason=$(grep '^blocked_reason=' "$state_file" | head -1 | cut -d= -f2- || true)
     # New per-tier fields may be absent on older or simpler state files;
     # tolerate via `|| true` so set -e / pipefail doesn't kill the loop.
     role=$(grep '^role=' "$state_file" | head -1 | cut -d= -f2- || true)

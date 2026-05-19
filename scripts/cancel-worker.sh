@@ -32,11 +32,12 @@ if [[ ! -f "$state_file" ]]; then
 fi
 
 worktree_path=$(grep '^worktree_path=' "$state_file" | head -1 | cut -d= -f2-)
-branch=$(grep '^branch=' "$state_file" | head -1 | cut -d= -f2-)
+# branch may be absent (critics have no branch); tolerate via || true.
+branch=$(grep '^branch=' "$state_file" | head -1 | cut -d= -f2- || true)
 state=$(grep '^state=' "$state_file" | head -1 | cut -d= -f2-)
 role=$(grep '^role=' "$state_file" | head -1 | cut -d= -f2-)
 role="${role:-worker}"
-pair_mode=$(grep '^pair_mode=' "$state_file" | head -1 | cut -d= -f2-)
+pair_mode=$(grep '^pair_mode=' "$state_file" | head -1 | cut -d= -f2- || true)
 
 if [[ "$state" == "merged" ]]; then
     echo "error: $role $slug was already merged; nothing to cancel" >&2
