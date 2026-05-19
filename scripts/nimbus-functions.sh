@@ -70,6 +70,37 @@ nimbus-dashboard() {
 
 # -- auditor mode -------------------------------------------------------
 
+# Start a background sweeper that periodically runs
+# check-stalled-pairs.sh, so the auditor learns about pairs stuck in
+# awaiting-review / awaiting-revision without needing a user prompt or
+# any other state-change wake-up to fire. The loop checks every 60s and
+# self-terminates when the auditor tmux session dies, so it's safe to
+# leave running across reattaches.
+#
+# Idempotent: if a sweeper is already alive (pidfile points at a live
+# process), do nothing. The pidfile lives in the home repo's
+# .auditor-state so it survives shell reloads.
+__nimbus_start_stall_sweeper() {
+    local home_repo="$1"
+    local state_dir="$home_repo/.auditor-state"
+    [[ -d "$state_dir" ]] || return 0
+    local pidfile="$state_dir/.stall-sweeper.pid"
+    if [[ -f "$pidfile" ]]; then
+        local existing
+        existing=$(cat "$pidfile" 2>/dev/null)
+        if [[ -n "$existing" ]] && kill -0 "$existing" 2>/dev/null; then
+            return 0
+        fi
+    fi
+    ( while sleep 60; do
+          tmux has-session -t nimbus-auditor 2>/dev/null || exit 0
+          "$home_repo/scripts/check-stalled-pairs.sh" >/dev/null 2>&1 || true
+      done ) >/dev/null 2>&1 &
+    echo "$!" > "$pidfile"
+    disown 2>/dev/null || true
+}
+
+
 # Boot or attach to the auditor. The auditor runs inside a dedicated
 # tmux session (`nimbus-auditor`) so worker/debugger/lightweight/critic
 # scripts can push wake-up prompts into it via tmux send-keys when
@@ -106,9 +137,11 @@ nimbus-audit() {
 
     local session="nimbus-auditor"
     if tmux has-session -t "$session" 2>/dev/null; then
+        __nimbus_start_stall_sweeper "$home_repo"
         tmux attach -t "$session"
         return
     fi
+    __nimbus_start_stall_sweeper "$home_repo"
     local task="$*"
     local prompt='**read $NIMBUS_HOME/AUDITOR.md before you act — you orchestrate other agents, you do not code yourself**
 
@@ -157,9 +190,11 @@ nimbus-audit-resume() {
     local session="nimbus-auditor"
     if tmux has-session -t "$session" 2>/dev/null; then
         echo "auditor session already running; attaching."
+        __nimbus_start_stall_sweeper "$home_repo"
         tmux attach -t "$session"
         return
     fi
+    __nimbus_start_stall_sweeper "$home_repo"
     tmux new-session -A -s "$session" -n auditor \
         -e NIMBUS_ROLE=auditor \
         -e NIMBUS_HOME="$NIMBUS_HOME" \
