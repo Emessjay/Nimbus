@@ -4,9 +4,10 @@
 # Usage:
 #   ./scripts/lightweight-done.sh "<one-line summary>"
 #
-# Must be run from the main checkout (lightweights do not have their own
-# worktree) while HEAD is on fix/<slug>. Refuses if no commits ahead of
-# main — catches the common mistake of marking done before committing.
+# Lightweights commit directly to `main` (no branch). Refuses if no
+# commits exist between the recorded start_sha and HEAD — catches the
+# common mistake of marking done before committing. There is no
+# auto-integration step: HEAD is already on main by definition.
 
 set -euo pipefail
 
@@ -18,15 +19,37 @@ fi
 summary="$*"
 
 branch=$(git rev-parse --abbrev-ref HEAD)
-if [[ "$branch" != fix/* ]]; then
-    echo "error: HEAD is on '$branch', not a fix/<slug> branch" >&2
-    echo "       lightweights run on fix/<slug>; aborting." >&2
+if [[ "$branch" != "main" ]]; then
+    echo "error: HEAD is on '$branch', expected 'main'" >&2
+    echo "       lightweights commit directly to main; aborting." >&2
     exit 1
 fi
-slug="${branch#fix/}"
 
 main_repo=$(git rev-parse --show-toplevel)
 state_dir="$main_repo/.auditor-state"
+
+# nimbus-worker.sh exports NIMBUS_WORKER_SLUG at boot; prefer it as the
+# canonical source of truth. Fall back to scanning state files for the
+# active lightweight (cap 1) for self-tests or unusual contexts.
+slug="${NIMBUS_WORKER_SLUG:-}"
+if [[ -z "$slug" ]]; then
+    shopt -s nullglob
+    for sf in "$state_dir"/*.state; do
+        role=$(grep '^role=' "$sf" | head -1 | cut -d= -f2-)
+        s=$(grep '^state=' "$sf" | head -1 | cut -d= -f2-)
+        if [[ "$role" == "lightweight" && ( "$s" == "running" || "$s" == "blocked" ) ]]; then
+            slug=$(grep '^slug=' "$sf" | head -1 | cut -d= -f2-)
+            break
+        fi
+    done
+    shopt -u nullglob
+fi
+
+if [[ -z "$slug" ]]; then
+    echo "error: could not determine lightweight slug (no active lightweight state file)" >&2
+    exit 1
+fi
+
 state_file="$state_dir/$slug.state"
 
 if [[ ! -f "$state_file" ]]; then
@@ -40,34 +63,18 @@ if [[ "$role" != "lightweight" ]]; then
     exit 1
 fi
 
-ahead=$(git rev-list --count main..HEAD 2>/dev/null || echo "0")
-if [[ "$ahead" -eq 0 ]]; then
-    echo "error: no commits ahead of main on $branch" >&2
-    echo "       commit your work before marking the task done." >&2
+start_sha=$(grep '^start_sha=' "$state_file" | head -1 | cut -d= -f2- || true)
+if [[ -z "$start_sha" ]]; then
+    echo "error: no start_sha recorded in state file — cannot determine commit range" >&2
+    echo "       (state file pre-dates lightweight-no-branch refactor; cancel and respawn.)" >&2
     exit 1
 fi
 
-# Integrate main before flipping state, so the auditor's
-# merge-lightweight is always a fast-forward. If the merge conflicts,
-# leave state untouched and bail — the lightweight resolves and reruns
-# this script.
-if ! git merge-base --is-ancestor main HEAD; then
-    echo "main has moved since you branched; integrating..."
-    if git merge main --no-edit; then
-        echo "merged main into $branch cleanly."
-    else
-        git merge --abort
-        cat >&2 <<EOF
-error: main moved while you worked and merging produces conflicts.
-       Resolve manually:
-           git merge main
-           # edit conflicted files, then:
-           git add <files>
-           git commit
-       Then call this script again.
-EOF
-        exit 1
-    fi
+ahead=$(git rev-list --count "$start_sha..HEAD" 2>/dev/null || echo "0")
+if [[ "$ahead" -eq 0 ]]; then
+    echo "error: no commits between start_sha ($start_sha) and HEAD on main" >&2
+    echo "       commit your work before marking the task done." >&2
+    exit 1
 fi
 
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
