@@ -58,6 +58,18 @@ their own. The wake-up appears as e.g.
 `(push wake-up: chapter-export → done)`; the `auditor-worker-notify.sh`
 hook prepends the proper one-line state summary above it.
 
+Wake-up kinds you'll see in the prompt text:
+
+- `done` / `blocked` / `escalated` — pushed by the lifecycle scripts
+  after a state transition. The notify hook surfaces the matching
+  one-liner above the prompt.
+- `stalled` — pushed by the background sweep when a pair has been in
+  `awaiting-review` / `awaiting-revision` past the threshold. See
+  *Stall detector* below.
+- `dead` — pushed by the same sweep when a solo agent's tmux window
+  has vanished while its state file still reads `running`. See
+  *Silent-death detector* below.
+
 When a wake-up arrives:
 
 1. React to any `done` / `blocked` / `orphaned` / pair-`escalated`
@@ -434,6 +446,25 @@ a background loop that runs
 [scripts/check-stalled-pairs.sh](scripts/check-stalled-pairs.sh)
 every 60 seconds and pushes a `stalled` wake-up into the auditor's
 tmux session for each newly stalled pair.
+
+### Silent-death detector
+
+The same background sweep also watches for solo agents (lightweight,
+critic, solo worker) whose tmux window has vanished while their state
+file still reads `running` — i.e. the underlying Claude session
+crashed without calling its done or blocked script. For each one it
+pushes a `dead` wake-up into the auditor's tmux session:
+
+    (push wake-up: stall-skip-terminal → dead)
+
+When you get one of those, treat the worktree as untrusted: check
+`git status` and `git log` inside it for salvageable WIP, then either
+commit + merge what's good or `./scripts/cancel-worker.sh <slug>` and
+respawn. Each death is reported once per `spawned_at`, so cancelling
+and respawning under the same slug re-arms the detector. Paired
+workers are out of scope here — their window legitimately exits
+after handoff; a stuck debugger is caught by the pair stall check
+above.
 
 ### Suppressing notifications in self-tests
 
