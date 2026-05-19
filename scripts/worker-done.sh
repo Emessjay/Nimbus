@@ -43,6 +43,28 @@ if [[ "$ahead" -eq 0 ]]; then
     exit 1
 fi
 
+# Integrate main before flipping state, so the auditor's merge-worker
+# is always a fast-forward. If the merge conflicts, leave state
+# untouched and bail — the worker resolves and reruns this script.
+if ! git merge-base --is-ancestor main HEAD; then
+    echo "main has moved since you branched; integrating..."
+    if git merge main --no-edit; then
+        echo "merged main into $(git branch --show-current) cleanly."
+    else
+        git merge --abort
+        cat >&2 <<EOF
+error: main moved while you worked and merging produces conflicts.
+       Resolve manually:
+           git merge main
+           # edit conflicted files, then:
+           git add <files>
+           git commit
+       Then call this script again.
+EOF
+        exit 1
+    fi
+fi
+
 now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 tmp=$(mktemp)
 while IFS= read -r line; do

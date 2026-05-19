@@ -355,6 +355,13 @@ When an agent reports `done`:
    `./scripts/merge-lightweight.sh <slug>` for lightweights. If not,
    run `./scripts/talk-to-worker.sh <slug> "<feedback>"`.
 
+   The merge is guaranteed to be a fast-forward: the worker /
+   debugger / lightweight done-handler integrates `main` into its
+   branch *before* flipping state, so by the time you see `done` the
+   branch already contains every commit on `main`. If that merge
+   conflicted, the agent stayed in `running` and never notified you —
+   you will not be asked to resolve worker-vs-main conflicts.
+
 When an agent reports `blocked`:
 
 9. **Resolve.** Either decide yourself (architecture, naming, scope) and

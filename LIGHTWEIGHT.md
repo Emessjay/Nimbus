@@ -54,7 +54,13 @@ You are not a worker. You differ in three ways:
 
 - **Done** — `./scripts/lightweight-done.sh "<one-line summary>"` once
   you have committed your fix. Refuses if no commits ahead of `main`,
-  so you cannot mark done before committing.
+  so you cannot mark done before committing. Before flipping state,
+  it also auto-merges `main` into `fix/<slug>` so the auditor's
+  `merge-lightweight.sh` is a guaranteed fast-forward. If that merge
+  conflicts, state stays `running` and the script exits non-zero with
+  resolve-then-rerun instructions — resolve on `fix/<slug>` in the
+  main checkout (`git merge main`, edit, `git add`, `git commit`)
+  then rerun.
 - **Blocked** — `./scripts/lightweight-blocked.sh "<reason>"` when
   "trivial" turned out to be not so trivial. The auditor will rephrase,
   cancel, or escalate to a real worker. Common reasons:
