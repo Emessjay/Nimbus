@@ -16,9 +16,11 @@ This file is the operational handbook; treat it as binding.
   these. The sanctioned mutating commands are the agent-control
   scripts (`spawn-worker.sh`, `spawn-pair.sh`, `spawn-lightweight.sh`,
   `spawn-critic.sh`, `talk-to-worker.sh`, `talk-to-debugger.sh`,
-  `talk-to-critic.sh`, `merge-worker.sh`, `merge-lightweight.sh`,
-  `merge-critic.sh`, `cancel-worker.sh`); when called via these
-  scripts, the inner git operations are permitted.
+  `merge-worker.sh`, `merge-lightweight.sh`, `merge-critic.sh`,
+  `cancel-worker.sh`); when called via these scripts, the inner git
+  operations are permitted. Note: there is no `talk-to-critic.sh` —
+  each critic round is a fresh `spawn-critic.sh`; see "Critic review"
+  below.
 - **Never** spawn a `subagent_type: claude` or `general-purpose` Agent
   — those have edit access and would bypass worker-review.
   `auditor-no-editing-subagents.sh` blocks them. Only `Explore`,
@@ -220,8 +222,13 @@ because the critic is a focused, optional pass — not a default step.
 
 **The loop is fix-until-shippable, not read-and-summarize.** The
 critic is a gate on the merged feature, not a post-mortem report.
-You keep dispatching fixes and re-invoking the critic until it
-declares the work shippable. When the critic reports `done`:
+You keep dispatching fixes and **spawning a fresh critic** until
+one declares the work shippable. Each round is a brand-new critic
+process with no memory of prior rounds — this is deliberate: it
+removes anchoring bias (a critic that flagged X last round won't
+soften on X this round just because you "addressed" it) and forces
+the brief to carry forward whatever context the new critic needs.
+When the current critic reports `done`:
 
 1. **Read the verdict line.** The first line of
    `.auditor-state/<slug>.critique.md` is one of:
@@ -244,24 +251,40 @@ declares the work shippable. When the critic reports `done`:
    independent fixers in parallel where they touch disjoint files
    (see *Default: parallelize* above). Review and merge them as they
    come back `done`, exactly like normal worker review.
-4. **Re-invoke the critic.** Once every dispatched fix has landed on
-   `main`, run
-   `./scripts/talk-to-critic.sh <slug> "<one-line summary of what
-   you fixed, what you intentionally skipped, and why>"`. The
-   critic's tmux window is still alive; it picks up the revision
-   prompt, re-tests the product against the new `main`, and writes
-   an updated critique with a fresh verdict. Each round bumps
-   `review_rounds` and appends to
-   `.auditor-state/<slug>.critique.log`.
-5. **Loop back to step 1** when the critic next reports `done`.
+4. **Archive the current critic and spawn a fresh one.** Once every
+   dispatched fix has landed on `main`:
+   - First archive the existing critic's outputs so the new round's
+     critique file doesn't clobber them. Rename
+     `.auditor-state/<slug>.critique.md` →
+     `.auditor-state/<slug>.critique.r<N>.md` (where N is the
+     completed round, starting at 1) and likewise rename
+     `.auditor-state/<slug>.screenshots/` →
+     `.auditor-state/<slug>.screenshots.r<N>/`.
+   - Then `./scripts/cancel-worker.sh <slug>` to free the critic
+     slot (kills its tmux window, marks `state=cancelled`).
+   - Then `./scripts/spawn-critic.sh <slug> @<brief-file>` with a
+     **revision brief** that names what landed since the prior
+     round, what you intentionally skipped, and where to find the
+     previous round's critique (`.critique.r<N>.md`) so the new
+     critic can read it as reference if it wants. The new critic
+     is still code-blind; the prior critique is a peer-written
+     artefact, not source.
+   - The revision brief should still embed the user's original
+     instructions verbatim and the same UI-paths-to-reach list as
+     the first round's brief — the fresh critic has no memory of
+     either.
+5. **Loop back to step 1** when the new critic reports `done`.
 
 The loop only exits via `Verdict: ship` (your merge) or the review
-cap (auto-escalation to you at round 5; from there, surface to the
-user with the unresolved findings and ask whether to ship anyway,
-keep iterating, or shelve). Do not preemptively `merge-critic` a
-`needs-fixes` verdict just because you disagree with the critic —
-the right move is a revision that explains your disagreement and
-lets the critic update its verdict in response.
+cap. You decide your own cap — pick a number you'd be embarrassed
+to exceed for this feature (a small UI fix: 3 rounds; a sweeping
+refactor: 5–6). When you hit it, surface to the user with the
+unresolved findings and ask whether to ship anyway, keep iterating,
+or shelve. Do not preemptively `merge-critic` a `needs-fixes`
+verdict just because you disagree with the critic — the right move
+is to spawn the next round with a revision brief that explains
+your disagreement and lets the new critic update the verdict in
+response.
 
 **Summarizing for the user.** After accepting a `ship` verdict, give
 the user a short summary: how many iterations the loop took, the
@@ -272,8 +295,9 @@ session; just stop the response. The user will reply or move on.
 
 When a `critic <slug> blocked` arrives, the critic couldn't reach the
 feature — usually a tooling / build issue. Fix it (spawn a
-lightweight if needed) and unblock with `talk-to-critic.sh`, or
-cancel the critic and respawn after the fix.
+lightweight if needed), then cancel the blocked critic and spawn a
+fresh one against the same slug. There is no in-place unblock — the
+fresh-critic-per-round rule applies to blocked critics too.
 
 ## Bootstrapping a new project
 
